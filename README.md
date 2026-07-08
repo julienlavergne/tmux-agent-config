@@ -9,6 +9,7 @@ live config updates immediately (and is already tracked by git).
 | Path | Symlinked to | Purpose |
 |---|---|---|
 | `tmux/tmux.conf` | `~/.tmux.conf` | Mouse support, clipboard integration, vi copy-mode, scrollback, window titles. |
+| `tmux/tmux-picker.sh` | `~/.tmux-picker-fzf.sh` | fzf-based login-shell picker: attach/create/delete tmux sessions interactively on login. Requires `fzf`. |
 | `claude/settings.json` | `~/.claude/settings.json` | Claude Code permission allowlist, statusline wiring, theme/notification prefs. |
 | `claude/CLAUDE.md` | `~/.claude/CLAUDE.md` | Global Claude Code instructions: environment, session-naming convention, project layout, tooling conventions, content style, multi-agent feature workflow. |
 | `claude/rules/common.md` | `~/.claude/rules/common.md` | Engineering rules (code quality, security, testing, git, review) auto-loaded by Claude Code. |
@@ -24,6 +25,26 @@ live config updates immediately (and is already tracked by git).
 git clone git@github.com:julienlavergne/tmux-agent-config.git ~/workspace/tmux-agent-config
 ~/workspace/tmux-agent-config/install.sh
 ```
+
+Then add the login picker hook to `~/.profile` (once per machine, before the PATH block):
+
+```bash
+# Tmux session picker (runs on interactive login, skipped when already in tmux)
+if [[ -z "$TMUX" && -t 0 ]] && command -v tmux &>/dev/null; then
+    if command -v fzf &>/dev/null; then
+        _tp_tmp=$(mktemp)
+        bash ~/.tmux-picker-fzf.sh "$_tp_tmp"
+        _tp_choice=$(cat "$_tp_tmp" 2>/dev/null); rm -f "$_tp_tmp"
+        case "$_tp_choice" in
+            tmux:*) exec tmux attach-session -t "${_tp_choice#tmux:}" ;;
+            new:*)  exec tmux new-session -A -s "${_tp_choice#new:}" ;;
+        esac
+        unset _tp_tmp _tp_choice
+    fi
+fi
+```
+
+`fzf` must be installed (`apt install fzf` or `brew install fzf`).
 
 `install.sh` symlinks every path above into place. If a real file already
 exists at a target, it's backed up to `<path>.bak-<timestamp>` first — safe

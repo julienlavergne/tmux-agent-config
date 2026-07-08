@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# ~/.tmux-picker-fzf.sh
+# fzf-based tmux session picker (executable).
+# The sourced hook in ~/.profile runs this and acts on its output.
+#
+# Subcommands (used internally by fzf bindings):
+#   --list            print the fzf item list and exit
+#   --delete NAME     kill a tmux session and exit
+
+_reltime() {
+    local ts=${1:-0} now diff
+    now=$(date +%s); diff=$((now - ts))
+    if   ((ts == 0));         then printf 'never'
+    elif ((diff <    60));    then printf 'just now'
+    elif ((diff <  3600));    then printf '%dm ago'  $((diff/60))
+    elif ((diff < 86400));    then printf '%dh ago'  $((diff/3600))
+    else                           printf '%dd ago'  $((diff/86400))
+    fi
+}
+
+_list() {
+    local _tab=$'\t' ts attached name
+    printf '__BASH__\tJust enter bash\n'
+    while IFS=$'\t' read -r ts attached name; do
+        [[ -z "$name" || "$attached" != "0" ]] && continue
+        printf '%s\t%s  (%s)\n' "$name" "$name" "$(_reltime "$ts")"
+    done < <(
+        tmux list-sessions \
+            -F "#{session_last_attached}${_tab}#{session_attached}${_tab}#{session_name}" \
+            2>/dev/null | sort -rn
+    )
+}
+
+case "${1:-}" in
+    --list)
+        _list
+        exit 0
+        ;;
+    --delete)
+        name="${2:-}"
+        [[ -n "$name" && "$name" != __* ]] && tmux kill-session -t "$name" 2>/dev/null
+        exit 0
+        ;;
+esac
+
+# ── main picker ───────────────────────────────────────────────────────────────
+
+result_file="${1:?Usage: tmux-picker-fzf.sh RESULT_FILE}"
+script="$HOME/.tmux-picker-fzf.sh"
+
+output=$(
+    _list | fzf \
+        --no-sort \
+        --print-query \
+        --layout=reverse \
+        --delimiter=$'\t' \
+        --with-nth=2 \
+        --header='  ↑↓ navigate  ·  Enter select  ·  Del delete  ·  Type name to create' \
+        --prompt='  ❯ ' \
+        --bind="del:execute-silent($script --delete {1})+reload($script --list)" \
+        --color='header:italic'
+) || true  # fzf exits 130 on Ctrl-C / Esc — treat as "bash"
+
+query=$(head -1  <<< "$output")
+selected=$(tail -n +2 <<< "$output")
+key=$(cut -f1    <<< "${selected:-}")
+
+case "$key" in
+    ''|__BASH__)
+        # No session selected — create one if user typed a name
+        if [[ -n "$query" ]]; then
+            printf 'new:%s' "$query" > "$result_file"
+        else
+            printf 'bash' > "$result_file"
+        fi
+        ;;
+    *)
+        printf 'tmux:%s' "$key" > "$result_file"
+        ;;
+esac
