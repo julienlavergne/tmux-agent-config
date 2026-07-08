@@ -1,0 +1,21 @@
+# To add a new session:
+#   printf 'CWD=/path/to/workspace\nAGENT=claude\n' > ~/.config/ai-sessions/<name>.env
+#   systemctl --user enable --now ai-session@<name>.service
+#
+# <name> should follow the convention: <device>-<foldername>-<agent>
+# e.g. desktop-home-claude, desktop-game-copilot, laptop-home-claude
+
+[Unit]
+Description=AI Session (%i)
+After=default.target
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/ai-sessions/%i.env
+ExecStart=%h/.local/bin/ai-session-watch %i ${CWD} ${AGENT}
+ExecStop=/usr/bin/tmux kill-session -t %i
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,62 @@
+#!/bin/bash
+# Unified AI session watcher — maintains a named tmux pane for claude or copilot.
+
+NAME="$1"
+CWD="$2"
+AGENT="$3"
+
+CLAUDE="${HOME}/.local/bin/claude"
+COPILOT="${HOME}/.local/bin/copilot"
+DB="${HOME}/.copilot/session-store.db"
+PROJECT_DIR="${HOME}/.claude/projects/$(echo "${CWD}" | sed 's|/|-|g')"
+
+make_claude_cmd() {
+    # Resolve to the exact session ID of the most recent transcript with this
+    # customTitle, so --resume never hits the picker even when multiple past
+    # sessions (e.g. from /reset) share the same name. --fork-session branches
+    # a fresh session ID off that transcript instead of attaching directly, so
+    # a respawn never collides with the same session still running as a
+    # background agent elsewhere (e.g. attached via Remote Control/FleetView).
+    local session_id
+    session_id=$(grep -l "\"customTitle\":\"${NAME}\"" "${PROJECT_DIR}"/*.jsonl 2>/dev/null \
+        | xargs -r ls -t 2>/dev/null \
+        | head -1 \
+        | xargs -r basename -s .jsonl)
+    if [[ -n "${session_id}" ]]; then
+        echo "${CLAUDE} --name ${NAME} --resume ${session_id} --fork-session --rc ${NAME}"
+    else
+        echo "${CLAUDE} --name ${NAME} --rc ${NAME}"
+    fi
+}
+
+make_copilot_cmd() {
+    local count
+    count=$(sqlite3 "${DB}" \
+        "SELECT COUNT(*) FROM session_refs WHERE ref_type='name' AND ref_value='${NAME}'" \
+        2>/dev/null)
+    if [[ "${count}" -gt 0 ]]; then
+        echo "${COPILOT} --resume=${NAME} --remote"
+    else
+        echo "${COPILOT} --name ${NAME} --remote"
+    fi
+}
+
+make_cmd() {
+    case "${AGENT}" in
+        claude)  make_claude_cmd ;;
+        copilot) make_copilot_cmd ;;
+    esac
+}
+
+if ! tmux has-session -t "${NAME}" 2>/dev/null; then
+    tmux new-session -d -s "${NAME}" -c "${CWD}" "$(make_cmd)"
+    tmux set-window-option -t "${NAME}" remain-on-exit on
+fi
+
+while tmux has-session -t "${NAME}" 2>/dev/null; do
+    if [[ "$(tmux display-message -t "${NAME}:0" -p '#{pane_dead}')" == "1" ]]; then
+        sleep 10
+        tmux respawn-pane -t "${NAME}:0" -k "$(make_cmd)"
+    fi
+    sleep 5
+done
