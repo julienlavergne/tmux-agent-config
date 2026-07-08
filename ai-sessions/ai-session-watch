@@ -35,9 +35,9 @@ make_copilot_cmd() {
         "SELECT COUNT(*) FROM session_refs WHERE ref_type='name' AND ref_value='${NAME}'" \
         2>/dev/null)
     if [[ "${count}" -gt 0 ]]; then
-        echo "${COPILOT} --resume=${NAME} --remote"
+        echo "${COPILOT} --yolo --resume=${NAME} --remote"
     else
-        echo "${COPILOT} --name ${NAME} --remote"
+        echo "${COPILOT} --yolo --name ${NAME} --remote"
     fi
 }
 
