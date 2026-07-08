@@ -9,7 +9,7 @@ live config updates immediately (and is already tracked by git).
 | Path | Symlinked to | Purpose |
 |---|---|---|
 | `tmux/tmux.conf` | `~/.tmux.conf` | Mouse support, clipboard integration, vi copy-mode, scrollback, window titles. |
-| `tmux/tmux-picker.sh` | `~/.tmux-picker-fzf.sh` | fzf-based login-shell picker: attach/create/delete tmux sessions interactively on login. Requires `fzf`. |
+| `tmux/tmux-picker` | `~/.local/bin/tmux-picker` | fzf-based login-shell picker: attach/create/delete tmux sessions interactively on login. Requires `fzf`. |
 | `claude/settings.json` | `~/.claude/settings.json` | Claude Code permission allowlist, statusline wiring, theme/notification prefs. |
 | `claude/CLAUDE.md` | `~/.claude/CLAUDE.md` | Global Claude Code instructions: environment, session-naming convention, project layout, tooling conventions, content style, multi-agent feature workflow. |
 | `claude/rules/common.md` | `~/.claude/rules/common.md` | Engineering rules (code quality, security, testing, git, review) auto-loaded by Claude Code. |

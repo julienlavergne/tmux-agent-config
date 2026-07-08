@@ -29,7 +29,7 @@ NC='\033[0m'
 # "repo-relative-path|target-path" pairs
 LINKS=(
     "tmux/tmux.conf|${HOME}/.tmux.conf"
-    "tmux/tmux-picker.sh|${HOME}/.tmux-picker-fzf.sh"
+    "tmux/tmux-picker|${HOME}/.local/bin/tmux-picker"
     "claude/settings.json|${HOME}/.claude/settings.json"
     "claude/CLAUDE.md|${HOME}/.claude/CLAUDE.md"
     "claude/rules/common.md|${HOME}/.claude/rules/common.md"
@@ -71,7 +71,7 @@ do_install() {
         link_one "${pair%%|*}" "${pair##*|}"
     done
 
-    chmod +x "${REPO_DIR}/tmux/tmux-picker.sh" "${REPO_DIR}/claude/statusline/statusline.sh" "${REPO_DIR}/ai-sessions/ai-session-watch"
+    chmod +x "${REPO_DIR}/tmux/tmux-picker" "${REPO_DIR}/claude/statusline/statusline.sh" "${REPO_DIR}/ai-sessions/ai-session-watch"
 
     if command -v systemctl >/dev/null 2>&1; then
         systemctl --user daemon-reload

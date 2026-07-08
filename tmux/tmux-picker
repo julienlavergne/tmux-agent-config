@@ -46,7 +46,7 @@ esac
 # ── main picker ───────────────────────────────────────────────────────────────
 
 result_file="${1:?Usage: tmux-picker-fzf.sh RESULT_FILE}"
-script="$HOME/.tmux-picker-fzf.sh"
+script="$HOME/.local/bin/tmux-picker"
 
 output=$(
     _list | fzf \
