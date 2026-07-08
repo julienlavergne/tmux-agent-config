@@ -85,24 +85,7 @@
       "Bash(du *)",
       "Bash(free *)"
     ],
-    "ask": [
-      "Bash(sudo *)",
-      "Bash(git push --force*)",
-      "Bash(git push -f *)",
-      "Bash(git reset --hard*)",
-      "Bash(git clean -f*)",
-      "Bash(docker rm *)",
-      "Bash(docker rmi *)",
-      "Bash(docker stop *)",
-      "Bash(docker kill *)",
-      "Bash(kill *)",
-      "Bash(pkill *)",
-      "Bash(killall *)",
-      "Bash(apt *)",
-      "Bash(apt-get *)",
-      "Bash(snap *)",
-      "Bash(dpkg *)"
-    ],
+    "ask": [],
     "defaultMode": "auto"
   },
   "statusLine": {
