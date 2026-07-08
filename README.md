@@ -9,9 +9,8 @@ live config updates immediately (and is already tracked by git).
 | Path | Symlinked to | Purpose |
 |---|---|---|
 | `tmux/tmux.conf` | `~/.tmux.conf` | Mouse support, clipboard integration, vi copy-mode, scrollback, window titles. |
-| `claude/settings.json` | `~/.claude/settings.json` | Claude Code permission allowlist, the `rtk` PreToolUse hook, statusline wiring, theme/notification prefs. |
-| `claude/CLAUDE.md` | `~/.claude/CLAUDE.md` | Global Claude Code instructions: environment, session-naming convention, project layout, tooling conventions, multi-agent feature workflow. |
-| `claude/RTK.md` | `~/.claude/RTK.md` | Rust Token Killer (rtk) CLI reference, `@`-included from `CLAUDE.md`. |
+| `claude/settings.json` | `~/.claude/settings.json` | Claude Code permission allowlist, statusline wiring, theme/notification prefs. |
+| `claude/CLAUDE.md` | `~/.claude/CLAUDE.md` | Global Claude Code instructions: environment, session-naming convention, project layout, tooling conventions, content style, multi-agent feature workflow. |
 | `claude/rules/common.md` | `~/.claude/rules/common.md` | Engineering rules (code quality, security, testing, git, review) auto-loaded by Claude Code. |
 | `claude/rules/python.md` | `~/.claude/rules/python.md` | Python-specific conventions, auto-loaded by Claude Code. |
 | `claude/statusline/statusline.sh` | `~/.claude/claude-cli-status/statusline.sh` | Custom statusline: project/branch, model, context usage bar, token counts, cost, rate limits. |
@@ -30,6 +29,15 @@ git clone git@github.com:julienlavergne/tmux-agent-config.git ~/workspace/tmux-a
 exists at a target, it's backed up to `<path>.bak-<timestamp>` first — safe
 to re-run any time. It also runs `systemctl --user daemon-reload` if
 `systemctl` is available.
+
+Once you've confirmed the symlinked config works, remove the backups:
+
+```bash
+~/workspace/tmux-agent-config/install.sh --clean-backups
+```
+
+This finds every `<path>.bak-*` left by past installs and deletes them after
+a confirmation prompt — no need to hunt them down by hand on each machine.
 
 ## Per-machine session setup
 

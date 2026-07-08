@@ -36,6 +36,16 @@ Projects live in `~/workspace/<project-name>/`. Each directory is an independent
 - **Task runner**: use `just` to define and run project commands. Check the `justfile` before writing ad-hoc shell invocations.
 - **Git & GitHub**: use `git` and the `gh` CLI. Repositories are hosted on github.com.
 
+## Content Style
+
+Write everything — code, comments, docs, READMEs, wiki/lore entries, config files — as if it always existed in its current, final form. The content is the target state, not a record of how it got there.
+
+- **No provenance**: don't mention where something was copied/extracted/ported from, what tool or repo it replaced, or the session/task that produced it.
+- **No history**: don't describe what something used to be, decisions that were reconsidered, or a changelog of reasoning embedded in the artifact itself.
+- **No meta-commentary**: code comments explain a non-obvious *why* for today's reader — never "added for the X fix", "replaces the old Y", "handles the Z flow from task N".
+- Applies everywhere content is generated for its own sake: source code, comments, README/doc prose, wiki and lore text, config files.
+- Does **not** apply to things that are inherently historical records: commit messages, PR descriptions, changelogs, and design docs explicitly requested — those are supposed to carry rationale and context.
+
 ## Feature Development Philosophy
 
 When asked to implement a feature, unless explicitly stated otherwise, always means a well-designed, tested, and fully integrated result — never a workaround, quick fix, or dirty solution. Quality takes priority over speed. The end result must look as if the feature was there from the beginning.
@@ -78,8 +88,6 @@ Feature requests follow this agent pipeline, looping until all agents are satisf
 ## Permissions
 - Docker: available on the current user, no sudo needed.
 - `sudo`: full rights are available but **require explicit user approval before each use**.
-
-@RTK.md
 
 ## Codebase Navigation
 
