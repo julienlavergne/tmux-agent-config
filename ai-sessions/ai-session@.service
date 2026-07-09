@@ -13,7 +13,7 @@ After=default.target
 Type=simple
 EnvironmentFile=%h/.config/ai-sessions/%i.env
 ExecStart=%h/.local/bin/ai-session-watch %i ${CWD} ${AGENT}
-ExecStop=/usr/bin/tmux kill-session -t %i
+ExecStop=/usr/bin/tmux kill-session -t =%i
 Restart=always
 RestartSec=5
 

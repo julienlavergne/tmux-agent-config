@@ -48,15 +48,19 @@ make_cmd() {
     esac
 }
 
-if ! tmux has-session -t "${NAME}" 2>/dev/null; then
+# "=NAME" forces an exact session-name match. Without it, tmux target lookup
+# matches on prefix, so e.g. "desktop-x-claude" would silently match an
+# already-running "desktop-x-claude-2" and this script would believe its own
+# session already exists — skipping creation and monitoring the wrong pane.
+if ! tmux has-session -t "=${NAME}" 2>/dev/null; then
     tmux new-session -d -s "${NAME}" -c "${CWD}" "$(make_cmd)"
     tmux set-window-option -t "${NAME}" remain-on-exit on
 fi
 
-while tmux has-session -t "${NAME}" 2>/dev/null; do
-    if [[ "$(tmux display-message -t "${NAME}:0" -p '#{pane_dead}')" == "1" ]]; then
+while tmux has-session -t "=${NAME}" 2>/dev/null; do
+    if [[ "$(tmux display-message -t "=${NAME}:0" -p '#{pane_dead}')" == "1" ]]; then
         sleep 10
-        tmux respawn-pane -t "${NAME}:0" -k "$(make_cmd)"
+        tmux respawn-pane -t "=${NAME}:0" -k "$(make_cmd)"
     fi
     sleep 5
 done
