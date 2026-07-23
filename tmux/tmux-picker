@@ -26,7 +26,7 @@ _list() {
         printf '%s\t%s  (%s)\n' "$name" "$name" "$(_reltime "$ts")"
     done < <(
         tmux list-sessions \
-            -F "#{session_last_attached}${_tab}#{session_attached}${_tab}#{session_name}" \
+            -F "#{?session_last_attached,#{session_last_attached},0}${_tab}#{session_attached}${_tab}#{session_name}" \
             2>/dev/null | sort -rn
     )
 }
