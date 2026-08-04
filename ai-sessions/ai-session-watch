@@ -5,6 +5,10 @@ NAME="$1"
 CWD="$2"
 AGENT="$3"
 
+# Seconds of tmux inactivity before the pane is respawned to refresh the
+# remote connection.  Set IDLE_TIMEOUT=0 in the session's .env to disable.
+IDLE_TIMEOUT="${IDLE_TIMEOUT:-21600}"  # default: 6 hours
+
 CLAUDE="${HOME}/.local/bin/claude"
 COPILOT="${HOME}/.local/bin/copilot"
 DB="${HOME}/.copilot/session-store.db"
@@ -57,10 +61,36 @@ if ! tmux has-session -t "=${NAME}" 2>/dev/null; then
     tmux set-window-option -t "${NAME}" remain-on-exit on
 fi
 
+# Baseline for idle measurement. respawn-pane does not advance
+# #{session_activity}, so idleness is measured from the later of real client
+# activity and our own last respawn — otherwise a genuinely idle, detached
+# session crosses the threshold and respawns on every loop, tearing down its
+# remote connection every few seconds.
+last_respawn=$(date +%s)
+
+respawn() {
+    tmux respawn-pane -t "=${NAME}:0" -k "$(make_cmd)"
+    last_respawn=$(date +%s)
+}
+
 while tmux has-session -t "=${NAME}" 2>/dev/null; do
     if [[ "$(tmux display-message -t "=${NAME}:0" -p '#{pane_dead}')" == "1" ]]; then
-        sleep 10
-        tmux respawn-pane -t "=${NAME}:0" -k "$(make_cmd)"
+        sleep 60
+        respawn
+    elif [[ "${IDLE_TIMEOUT}" -gt 0 ]]; then
+        # A live client (e.g. mobile Remote Control) means the session is in
+        # use; refreshing the pane now is exactly what drops the connection.
+        if [[ "$(tmux display-message -t "${NAME}" -p '#{session_attached}')" -gt 0 ]]; then
+            sleep 5
+            continue
+        fi
+        last_activity=$(tmux display-message -t "${NAME}" -p '#{session_activity}')
+        [[ "${last_respawn}" -gt "${last_activity}" ]] && last_activity="${last_respawn}"
+        idle_secs=$(( $(date +%s) - last_activity ))
+        if [[ "${idle_secs}" -gt "${IDLE_TIMEOUT}" ]]; then
+            logger -t ai-session-watch "${NAME}: idle ${idle_secs}s > ${IDLE_TIMEOUT}s, respawning"
+            respawn
+        fi
     fi
     sleep 5
 done
