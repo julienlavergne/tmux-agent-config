@@ -9,7 +9,7 @@ live config updates immediately (and is already tracked by git).
 | Path | Symlinked to | Purpose |
 |---|---|---|
 | `tmux/tmux.conf` | `~/.tmux.conf` | Mouse support, clipboard integration, vi copy-mode, scrollback, window titles. |
-| `tmux/tmux-picker` | `~/.local/bin/tmux-picker` | fzf-based login-shell picker: attach/create/delete tmux sessions interactively on login. Requires `fzf`. |
+| `tmux/tmux-picker` | `~/.local/bin/tmux-picker` | Login-shell picker: attach/create/delete tmux sessions interactively on login. Uses `fzf` for fuzzy search when it's installed, falls back to a plain numbered menu (no dependencies beyond bash + tmux) when it isn't. |
 | `claude/settings.json` | `~/.claude/settings.json` | Claude Code permission allowlist, statusline wiring, theme/notification prefs. |
 | `claude/CLAUDE.md` | `~/.claude/CLAUDE.md` | Global Claude Code instructions: environment, session-naming convention, project layout, tooling conventions, content style, multi-agent feature workflow. |
 | `claude/rules/common.md` | `~/.claude/rules/common.md` | Engineering rules (code quality, security, testing, git, review) auto-loaded by Claude Code. |
@@ -31,20 +31,20 @@ Then add the login picker hook to `~/.profile` (once per machine, before the PAT
 ```bash
 # Tmux session picker (runs on interactive login, skipped when already in tmux)
 if [[ -z "$TMUX" && -t 0 ]] && command -v tmux &>/dev/null; then
-    if command -v fzf &>/dev/null; then
-        _tp_tmp=$(mktemp)
-        bash ~/.tmux-picker-fzf.sh "$_tp_tmp"
-        _tp_choice=$(cat "$_tp_tmp" 2>/dev/null); rm -f "$_tp_tmp"
-        case "$_tp_choice" in
-            tmux:*) exec tmux attach-session -t "${_tp_choice#tmux:}" ;;
-            new:*)  exec tmux new-session -A -s "${_tp_choice#new:}" ;;
-        esac
-        unset _tp_tmp _tp_choice
-    fi
+    _tp_tmp=$(mktemp)
+    bash ~/.local/bin/tmux-picker "$_tp_tmp"
+    _tp_choice=$(cat "$_tp_tmp" 2>/dev/null); rm -f "$_tp_tmp"
+    case "$_tp_choice" in
+        tmux:*) exec tmux attach-session -t "${_tp_choice#tmux:}" ;;
+        new:*)  exec tmux new-session -A -s "${_tp_choice#new:}" ;;
+    esac
+    unset _tp_tmp _tp_choice
 fi
 ```
 
-`fzf` must be installed (`apt install fzf` or `brew install fzf`).
+`fzf` is optional (`apt install fzf` or `brew install fzf` for the fuzzy-search
+UI) — `tmux-picker` falls back to a plain numbered menu with the same
+attach/create/delete behavior when it isn't installed.
 
 `install.sh` symlinks every path above into place. If a real file already
 exists at a target, it's backed up to `<path>.bak-<timestamp>` first — safe
