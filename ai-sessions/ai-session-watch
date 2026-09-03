@@ -5,10 +5,6 @@ NAME="$1"
 CWD="$2"
 AGENT="$3"
 
-# Seconds of tmux inactivity before the pane is respawned to refresh the
-# remote connection.  Set IDLE_TIMEOUT=0 in the session's .env to disable.
-IDLE_TIMEOUT="${IDLE_TIMEOUT:-21600}"  # default: 6 hours
-
 CLAUDE="${HOME}/.local/bin/claude"
 COPILOT="${HOME}/.local/bin/copilot"
 DB="${HOME}/.copilot/session-store.db"
@@ -16,18 +12,23 @@ PROJECT_DIR="${HOME}/.claude/projects/$(echo "${CWD}" | sed 's|/|-|g')"
 
 make_claude_cmd() {
     # Resolve to the exact session ID of the most recent transcript with this
-    # customTitle, so --resume never hits the picker even when multiple past
-    # sessions (e.g. from /reset) share the same name. --fork-session branches
-    # a fresh session ID off that transcript instead of attaching directly, so
-    # a respawn never collides with the same session still running as a
-    # background agent elsewhere (e.g. attached via Remote Control/FleetView).
+    # customTitle, so --resume attaches to the SAME session every time (stable
+    # id, one persistent Remote Control entry) and never hits the picker even
+    # when several past transcripts share the name.
+    #
+    # NOTE: intentionally NO --fork-session. Forking rotated the session id on
+    # every respawn, which piled up a fresh Remote Control window per day.
+    # Resuming in place keeps a single persistent session with --rc enabled.
+    # Trade-off: never run a second agent (e.g. a cloud/FleetView background
+    # agent) that continues this same session id while the local pane is live,
+    # or both would append to the same transcript.
     local session_id
     session_id=$(grep -l "\"customTitle\":\"${NAME}\"" "${PROJECT_DIR}"/*.jsonl 2>/dev/null \
         | xargs -r ls -t 2>/dev/null \
         | head -1 \
         | xargs -r basename -s .jsonl)
     if [[ -n "${session_id}" ]]; then
-        echo "${CLAUDE} --name ${NAME} --resume ${session_id} --fork-session --rc ${NAME}"
+        echo "${CLAUDE} --name ${NAME} --resume ${session_id} --rc ${NAME}"
     else
         echo "${CLAUDE} --name ${NAME} --rc ${NAME}"
     fi
@@ -61,36 +62,10 @@ if ! tmux has-session -t "=${NAME}" 2>/dev/null; then
     tmux set-window-option -t "${NAME}" remain-on-exit on
 fi
 
-# Baseline for idle measurement. respawn-pane does not advance
-# #{session_activity}, so idleness is measured from the later of real client
-# activity and our own last respawn — otherwise a genuinely idle, detached
-# session crosses the threshold and respawns on every loop, tearing down its
-# remote connection every few seconds.
-last_respawn=$(date +%s)
-
-respawn() {
-    tmux respawn-pane -t "=${NAME}:0" -k "$(make_cmd)"
-    last_respawn=$(date +%s)
-}
-
 while tmux has-session -t "=${NAME}" 2>/dev/null; do
     if [[ "$(tmux display-message -t "=${NAME}:0" -p '#{pane_dead}')" == "1" ]]; then
         sleep 60
-        respawn
-    elif [[ "${IDLE_TIMEOUT}" -gt 0 ]]; then
-        # A live client (e.g. mobile Remote Control) means the session is in
-        # use; refreshing the pane now is exactly what drops the connection.
-        if [[ "$(tmux display-message -t "${NAME}" -p '#{session_attached}')" -gt 0 ]]; then
-            sleep 5
-            continue
-        fi
-        last_activity=$(tmux display-message -t "${NAME}" -p '#{session_activity}')
-        [[ "${last_respawn}" -gt "${last_activity}" ]] && last_activity="${last_respawn}"
-        idle_secs=$(( $(date +%s) - last_activity ))
-        if [[ "${idle_secs}" -gt "${IDLE_TIMEOUT}" ]]; then
-            logger -t ai-session-watch "${NAME}: idle ${idle_secs}s > ${IDLE_TIMEOUT}s, respawning"
-            respawn
-        fi
+        tmux respawn-pane -t "=${NAME}:0" -k "$(make_cmd)"
     fi
     sleep 5
 done
