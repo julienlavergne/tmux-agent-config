@@ -88,6 +88,7 @@
     "ask": [],
     "defaultMode": "auto"
   },
+  "model": "opus[1m]",
   "statusLine": {
     "type": "command",
     "command": "$HOME/.claude/claude-cli-status/statusline.sh"
@@ -103,9 +104,13 @@
       }
     }
   },
+  "skipWorkflowUsageWarning": true,
   "theme": "dark",
   "remoteControlAtStartup": true,
   "inputNeededNotifEnabled": true,
   "agentPushNotifEnabled": true,
-  "skipAutoPermissionPrompt": true
+  "skipAutoPermissionPrompt": true,
+  "env": {
+    "TMPDIR": "/home/julien/tmp"
+  }
 }
