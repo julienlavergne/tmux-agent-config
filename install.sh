@@ -28,6 +28,7 @@ NC='\033[0m'
 
 # "repo-relative-path|target-path" pairs
 LINKS=(
+    "bash/inputrc|${HOME}/.inputrc"
     "tmux/tmux.conf|${HOME}/.tmux.conf"
     "tmux/tmux-picker|${HOME}/.local/bin/tmux-picker"
     "claude/settings.json|${HOME}/.claude/settings.json"

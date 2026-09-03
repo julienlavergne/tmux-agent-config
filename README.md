@@ -8,6 +8,7 @@ live config updates immediately (and is already tracked by git).
 
 | Path | Symlinked to | Purpose |
 |---|---|---|
+| `bash/inputrc` | `~/.inputrc` | Readline/autocomplete behavior: menu-complete tab cycling, case-insensitive and colored completion, history search with arrow keys. |
 | `tmux/tmux.conf` | `~/.tmux.conf` | Mouse support, clipboard integration, vi copy-mode, scrollback, window titles. |
 | `tmux/tmux-picker` | `~/.local/bin/tmux-picker` | Login-shell picker: attach/create/delete tmux sessions interactively on login. Uses `fzf` for fuzzy search when it's installed, falls back to a plain numbered menu (no dependencies beyond bash + tmux) when it isn't. |
 | `claude/settings.json` | `~/.claude/settings.json` | Claude Code permission allowlist, statusline wiring, theme/notification prefs. |
