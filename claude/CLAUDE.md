@@ -57,7 +57,7 @@ Feature requests follow this agent pipeline, looping until all agents are satisf
 **Context handoff**: each agent writes its output to a file (e.g. `design.md`, test files) and the next agent receives the file path — never inline the previous output into the prompt.
 
 1. **Architect / Designer** (`opus` class model)
-   - Explores the codebase first using graphify (`graphify query/path/explain` if `graphify-out/graph.json` exists, otherwise build it with `/graphify .` first): identifies existing patterns, reuse opportunities, inter-module dependencies, and potential conflicts.
+   - Explores the codebase first using graphify (`graphify query/path/explain` if `graphify-out/graph.json` exists and is up to date, otherwise build or refresh it first with `/graphify .` or `/graphify . --update`): identifies existing patterns, reuse opportunities, inter-module dependencies, and potential conflicts.
    - Designs the feature as a natural extension of the existing codebase.
    - Per-workspace design instructions take precedence when they exist.
    - Produces a clear interface with no circular dependencies, no code duplication, no feature creep, no spaghetti code, and high testability.
@@ -93,8 +93,8 @@ Feature requests follow this agent pipeline, looping until all agents are satisf
 
 When exploring or reasoning about a codebase, prefer the knowledge graph over manual grepping and file reading:
 
-- **If `graphify-out/graph.json` exists in the project**: use `graphify query "<question>"`, `graphify path "<A>" "<B>"`, and `graphify explain "<concept>"` as the primary navigation tools. Do not grep or read files to answer structural questions the graph can already answer.
+- **If `graphify-out/graph.json` exists and is up to date** (nothing in the tree has changed since it was built): use `graphify query "<question>"`, `graphify path "<A>" "<B>"`, and `graphify explain "<concept>"` as the primary navigation tools. Do not grep or read files to answer structural questions the graph can already answer.
 - **If the graph does not exist and significant exploration is needed** (e.g. understanding a new project, starting the Architect step): run `/graphify .` first to build it, then query it.
-- **After code changes**: use `/graphify . --update` rather than rebuilding from scratch.
+- **If the graph exists but is stale** (code has changed since it was built): run `/graphify . --update` to refresh it before querying — never trust a stale graph's answers.
 
 The `/graphify` skill (`~/.claude/skills/graphify/SKILL.md`) drives the full build pipeline. Invoke it when the user types `/graphify` or when building the graph for the first time.
