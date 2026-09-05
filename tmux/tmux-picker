@@ -1,24 +1,23 @@
 #!/usr/bin/env bash
 # ~/.local/bin/tmux-picker
 # tmux session picker (executable), invoked by the login hook in ~/.profile.
-# Uses fzf when available for a fuzzy-search UI; falls back to a plain
-# numbered menu (pure bash + tmux, no external deps) when it isn't.
-# Both paths write the same protocol to RESULT_FILE, so the caller in
-# ~/.profile doesn't need to know which one ran:
+# fzf-based fuzzy-search UI (fzf is required and present on all target hosts).
+# Writes a small protocol to RESULT_FILE for the caller in ~/.profile:
 #   bash            -> just drop into a plain shell
 #   new:<name>      -> tmux new-session -A -s <name>  (the -A also covers
 #                       "name happens to match an existing session")
 #   tmux:<name>     -> tmux attach-session -t <name>
 #
-# Subcommands (used internally, by fzf's del binding and by the plain menu):
+# Subcommands (used internally by fzf's del binding):
 #   --list            print the item list and exit
 #   --delete NAME     kill a tmux session and exit
 #
 # Item lines are "key|display". A literal '|' delimiter, not tab: without a
-# UTF-8 locale (common on a minimal box — exactly where fzf is also likely
-# missing) tmux's -F engine silently substitutes '_' for tab characters,
-# which would corrupt the split. '|' isn't a control character so it survives
-# regardless of locale, and tmux session names can't contain it anyway.
+# UTF-8 locale (common on a minimal box) tmux's -F engine silently substitutes
+# '_' for tab characters, which would corrupt the split. '|' isn't a control
+# character so it survives regardless of locale, and tmux session names can't
+# contain it anyway. fzf's --delimiter is a regex, so the pipe is written as
+# the character class '[|]' to match a literal '|' (a bare '|' is alternation).
 
 _reltime() {
     local ts=${1:-0} now diff
@@ -56,76 +55,17 @@ case "${1:-}" in
         ;;
 esac
 
-# ── plain (no-fzf) picker ───────────────────────────────────────────────────
-#
-# Same list, same sort order, same result-file contract as the fzf picker
-# below. Instead of fuzzy search: a numbered menu. Enter with nothing typed
-# picks the highlighted-by-default top entry (__BASH__), matching fzf's
-# empty-query-Enter behavior. Typing a number attaches that entry. Typing
-# "d N" deletes entry N and redraws, matching fzf's del binding. Anything
-# else typed is treated as a new session name to create.
-
-_pick_plain() {
-    local result_file="$1" items name key num reply line i
-
-    while true; do
-        mapfile -t items < <(_list)
-
-        echo
-        i=1
-        for line in "${items[@]}"; do
-            printf '  %2d) %s\n' "$i" "${line#*|}"
-            ((i++))
-        done
-        echo
-        printf '  Enter=bash · number=attach · name=create · d N=delete\n'
-        read -r -p '  > ' reply
-
-        if [[ -z "$reply" ]]; then
-            printf 'bash' > "$result_file"
-            return
-        fi
-
-        if [[ "$reply" =~ ^[Dd][[:space:]]+([0-9]+)$ ]]; then
-            num="${BASH_REMATCH[1]}"
-            if ((num >= 1 && num <= ${#items[@]})); then
-                key="${items[$((num-1))]%%|*}"
-                [[ "$key" != __* ]] && tmux kill-session -t "$key" 2>/dev/null
-            fi
-            continue
-        fi
-
-        if [[ "$reply" =~ ^[0-9]+$ ]] && ((reply >= 1 && reply <= ${#items[@]})); then
-            key="${items[$((reply-1))]%%|*}"
-            if [[ "$key" == __* ]]; then
-                printf 'bash' > "$result_file"
-            else
-                printf 'tmux:%s' "$key" > "$result_file"
-            fi
-            return
-        fi
-
-        printf 'new:%s' "$reply" > "$result_file"
-        return
-    done
-}
-
 # ── main picker ───────────────────────────────────────────────────────────────
 
 result_file="${1:?Usage: tmux-picker RESULT_FILE}"
 script="$HOME/.local/bin/tmux-picker"
-
-if ! command -v fzf &>/dev/null; then
-    _pick_plain "$result_file"
-    exit 0
-fi
 
 output=$(
     _list | fzf \
         --no-sort \
         --print-query \
         --layout=reverse \
-        --delimiter='|' \
+        --delimiter='[|]' \
         --with-nth=2 \
         --header='  ↑↓ navigate  ·  Enter select  ·  Del delete  ·  Type name to create' \
         --prompt='  ❯ ' \
