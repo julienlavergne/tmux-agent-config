@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# restart-ai-sessions — restart AI-session systemd units on THIS host.
+#
+# Each ai-session@<name> unit's ExecStop kills its tmux session and ExecStart
+# re-runs ai-session-watch, which recreates the pane and resumes the agent. So
+# a systemd restart is a full teardown + fresh resume of the session.
+#
+# Only touches this user's local units, so it affects just the machine it runs
+# on. With no arguments it restarts every ai-session@ unit found; pass names to
+# restart only some of them:
+#   restart-ai-sessions laptop-home-claude laptop-home-copilot
+#
+# NOTE: if you run this from inside one of the sessions being restarted, that
+# session's shell (this script included) is killed mid-restart. All the jobs
+# are handed to systemd in a single call first, so every unit still restarts —
+# you just lose this script's final status output. Run it from a different pane
+# (e.g. the `main` session) if you want to watch it finish.
+set -euo pipefail
+
+if (($# > 0)); then
+    units=()
+    for name in "$@"; do
+        units+=("ai-session@${name}.service")
+    done
+else
+    mapfile -t units < <(
+        systemctl --user list-units 'ai-session@*.service' --all --plain --no-legend 2>/dev/null \
+            | awk 'NF {print $1}'
+    )
+fi
+
+if ((${#units[@]} == 0)); then
+    echo "No ai-session@ units found for this user." >&2
+    exit 1
+fi
+
+echo "Restarting ${#units[@]} AI session unit(s):"
+printf '  %s\n' "${units[@]}"
+
+systemctl --user restart "${units[@]}"
+
+echo
+echo "Done. Current state:"
+systemctl --user list-units 'ai-session@*.service' --all --no-pager --no-legend

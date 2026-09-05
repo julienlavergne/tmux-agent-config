@@ -38,6 +38,7 @@ LINKS=(
     "claude/statusline/statusline.sh|${HOME}/.claude/claude-cli-status/statusline.sh"
     "ai-sessions/ai-session@.service|${HOME}/.config/systemd/user/ai-session@.service"
     "ai-sessions/ai-session-watch|${HOME}/.local/bin/ai-session-watch"
+    "ai-sessions/restart-ai-sessions|${HOME}/.local/bin/restart-ai-sessions"
 )
 
 link_one() {
@@ -72,7 +73,7 @@ do_install() {
         link_one "${pair%%|*}" "${pair##*|}"
     done
 
-    chmod +x "${REPO_DIR}/tmux/tmux-picker" "${REPO_DIR}/claude/statusline/statusline.sh" "${REPO_DIR}/ai-sessions/ai-session-watch"
+    chmod +x "${REPO_DIR}/tmux/tmux-picker" "${REPO_DIR}/claude/statusline/statusline.sh" "${REPO_DIR}/ai-sessions/ai-session-watch" "${REPO_DIR}/ai-sessions/restart-ai-sessions"
 
     if command -v systemctl >/dev/null 2>&1; then
         systemctl --user daemon-reload
