@@ -131,7 +131,7 @@ npm install -g @ccpocket/bridge@1.88.0
 ./install.sh
 ```
 
-Create the private local configuration from `ccpocket/bridge.env.example`, use your machine's LAN address and workspace directory, and generate a pairing key:
+Create the private local configuration from `ccpocket/bridge.env.example`, use your machine's Meshnet or LAN address and workspace directory, and generate a pairing key:
 
 ```bash
 install -d -m 700 ~/.config/ccpocket
@@ -148,7 +148,9 @@ systemctl --user enable --now ccpocket-bridge.service
 ccpocket-pair
 ```
 
-The desktop LAN endpoint is `ws://192.168.77.2:8765`. Scan the QR from CC Pocket on a device connected to the same home network. The QR includes the authentication key. Regenerate it with `ccpocket-pair` after changing the key or address. The endpoint is for the home LAN; access away from home needs a private tunnel or VPN connection to this network.
+The desktop's advertised endpoint is `ws://100.121.101.37:8765`, its NordVPN Meshnet address (`julien-desktop-meshnet`). Enable Meshnet on the phone under the same Nord account, then enter that endpoint and the bridge key in CC Pocket or scan the pairing QR. Linked devices need permission to access the desktop remotely. Meshnet provides the private route when away from home; see the [Meshnet remote-access guide](https://meshnet.nordvpn.com/how-to/joint-projects/nginx-web-server-access).
+
+The home-LAN endpoint `ws://192.168.77.2:8765` also remains available while on that network. The QR includes the authentication key and uses `BRIDGE_PUBLIC_WS_URL` from the local configuration. Regenerate it with `ccpocket-pair` after changing the key or address.
 
 Use `systemctl --user restart ccpocket-bridge` after configuration or package updates, and `systemctl --user status ccpocket-bridge` or `journalctl --user -u ccpocket-bridge` to inspect it. The bridge preserves the existing CLI services; it manages its own sessions. `update-ai-clis` updates the installed Bridge package without restarting active sessions.
 
