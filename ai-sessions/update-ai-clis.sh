@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# update-ai-clis.sh — update Claude, Copilot, and Codex CLIs
+# update-ai-clis.sh — update Claude, Copilot, Codex, and CC Pocket Bridge
 
 set -euo pipefail
 
@@ -56,6 +56,13 @@ if ~/.local/bin/codex app-server daemon update 2>&1 | grep -qi "already\|up.to.d
     ok "Codex daemon: already up to date"
 else
     ok "Codex daemon: updated"
+fi
+
+echo
+if npm list -g @ccpocket/bridge --depth=0 >/dev/null 2>&1; then
+    info "Updating CC Pocket Bridge..."
+    npm update -g @ccpocket/bridge 2>&1 | tail -3
+    ok "CC Pocket Bridge package updated; restart ccpocket-bridge when ready."
 fi
 
 echo

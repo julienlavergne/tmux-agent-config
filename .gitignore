@@ -10,3 +10,5 @@ auth.json
 *.codex-id
 *.copilot-id
 *.log
+bridge.env
+pairing.png

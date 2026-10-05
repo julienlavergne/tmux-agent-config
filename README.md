@@ -29,7 +29,11 @@ live config updates immediately (and is already tracked by git).
 | `ai-sessions/profiles/desktop/*.env` | `~/.config/ai-sessions/*.env` *(with `--sessions desktop`)* | Desktop session definitions; installation does not start or restart sessions. |
 | `ai-sessions/profiles/desktop/enabled-sessions.txt` | *(restoration inventory)* | Names of enabled desktop AI-session services. |
 | `ai-sessions/restart-ai-sessions` | `~/.local/bin/restart-ai-sessions` | Restarts `ai-session@` systemd units on this host — all of them, or specific names passed as arguments. |
-| `ai-sessions/update-ai-clis.sh` | `~/.local/bin/update-ai-clis`, `~/update-ai-clis.sh` | Updates Claude, Copilot, Codex, and the Codex app-server daemon. The home-directory link preserves the original invocation. |
+| `ai-sessions/update-ai-clis.sh` | `~/.local/bin/update-ai-clis`, `~/update-ai-clis.sh` | Updates Claude, Copilot, Codex, the Codex app-server daemon, and CC Pocket Bridge when installed. The home-directory link preserves the original invocation. |
+| `ccpocket/ccpocket-bridge.service` | `~/.config/systemd/user/ccpocket-bridge.service` | Persistent authenticated CC Pocket Bridge service. |
+| `ccpocket/start-bridge` | `~/.local/bin/start-ccpocket-bridge` | Launches the installed Bridge in the active Node environment without printing pairing credentials in service logs. |
+| `ccpocket/pair` | `~/.local/bin/ccpocket-pair` | Displays a local pairing QR and saves it to `~/.ccpocket/pairing.png`. |
+| `ccpocket/bridge.env.example` | *(local configuration template)* | Bridge address, workspace scope and Claude authentication opt-in. The real key stays in `~/.config/ccpocket/bridge.env`. |
 | `ai-sessions/env.example` | *(not symlinked — a template)* | Per-session `CWD`/`AGENT` env file format consumed by the systemd unit. |
 
 ## Install (this machine or a new one)
@@ -117,6 +121,36 @@ sync so sessions are recognizable from FleetView / Remote Control on Android.
 - `~/.claude.json`, `~/.claude/.credentials.json` — session/auth state, not config.
 - `~/.codex/auth.json`, conversation databases, transcripts, logs and `~/.local/state/ai-sessions/` UUID mappings — credentials and runtime state.
 - Anything under `~/.claude/projects/` (including the memory system) — conversation history and learned memory, not portable setup.
+
+## CC Pocket Bridge
+
+Install the Node package and link the service and commands:
+
+```bash
+npm install -g @ccpocket/bridge@1.88.0
+./install.sh
+```
+
+Create the private local configuration from `ccpocket/bridge.env.example`, use your machine's LAN address and workspace directory, and generate a pairing key:
+
+```bash
+install -d -m 700 ~/.config/ccpocket
+install -m 600 ccpocket/bridge.env.example ~/.config/ccpocket/bridge.env
+node -e 'console.log(require("node:crypto").randomBytes(32).toString("base64url"))'
+```
+
+Set `BRIDGE_API_KEY` to that generated value. Keep the file local; it is not committed. Codex uses the machine's existing login. Claude subscription authentication is disabled unless you explicitly set `BRIDGE_ALLOW_CLAUDE_OAUTH=1`; see the [upstream Bridge documentation](https://github.com/K9i-0/ccpocket/blob/main/packages/bridge/README.md).
+
+Start the service and display the pairing QR:
+
+```bash
+systemctl --user enable --now ccpocket-bridge.service
+ccpocket-pair
+```
+
+The desktop LAN endpoint is `ws://192.168.77.2:8765`. Scan the QR from CC Pocket on a device connected to the same home network. The QR includes the authentication key. Regenerate it with `ccpocket-pair` after changing the key or address. The endpoint is for the home LAN; access away from home needs a private tunnel or VPN connection to this network.
+
+Use `systemctl --user restart ccpocket-bridge` after configuration or package updates, and `systemctl --user status ccpocket-bridge` or `journalctl --user -u ccpocket-bridge` to inspect it. The bridge preserves the existing CLI services; it manages its own sessions. `update-ai-clis` updates the installed Bridge package without restarting active sessions.
 
 ### Codex conversation persistence
 

@@ -38,6 +38,9 @@ LINKS=(
     "claude/settings.local.json|${HOME}/.claude/settings.local.json"
     "claude/CLAUDE.md|${HOME}/.claude/CLAUDE.md"
     "codex/launcher|${HOME}/.local/bin/codex"
+    "ccpocket/start-bridge|${HOME}/.local/bin/start-ccpocket-bridge"
+    "ccpocket/pair|${HOME}/.local/bin/ccpocket-pair"
+    "ccpocket/ccpocket-bridge.service|${HOME}/.config/systemd/user/ccpocket-bridge.service"
     "shared/AGENTS.md|${HOME}/.codex/AGENTS.md"
     "shared/AGENTS.md|${HOME}/.claude/rules/preferences.md"
     "claude/rules/common.md|${HOME}/.claude/rules/common.md"
@@ -113,7 +116,7 @@ do_install() {
     done
     seed_codex_config
 
-    chmod +x "${REPO_DIR}/tmux/tmux-picker" "${REPO_DIR}/claude/statusline/statusline.sh" "${REPO_DIR}/codex/launcher" "${REPO_DIR}/ai-sessions/ai-session-watch" "${REPO_DIR}/ai-sessions/ai-session-codex" "${REPO_DIR}/ai-sessions/ai-session-copilot" "${REPO_DIR}/ai-sessions/restart-ai-sessions" "${REPO_DIR}/ai-sessions/update-ai-clis.sh"
+    chmod +x "${REPO_DIR}/tmux/tmux-picker" "${REPO_DIR}/claude/statusline/statusline.sh" "${REPO_DIR}/codex/launcher" "${REPO_DIR}/ccpocket/start-bridge" "${REPO_DIR}/ccpocket/pair" "${REPO_DIR}/ai-sessions/ai-session-watch" "${REPO_DIR}/ai-sessions/ai-session-codex" "${REPO_DIR}/ai-sessions/ai-session-copilot" "${REPO_DIR}/ai-sessions/restart-ai-sessions" "${REPO_DIR}/ai-sessions/update-ai-clis.sh"
 
     if command -v systemctl >/dev/null 2>&1; then
         systemctl --user daemon-reload

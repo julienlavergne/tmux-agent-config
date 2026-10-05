@@ -1,0 +1,14 @@
+[Unit]
+Description=CC Pocket Bridge Server
+After=network.target
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/ccpocket/bridge.env
+ExecStart=%h/.local/bin/start-ccpocket-bridge
+Restart=on-failure
+RestartSec=5
+UMask=0077
+
+[Install]
+WantedBy=default.target

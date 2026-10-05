@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -eo pipefail
+
+export NVM_DIR="${NVM_DIR:-${HOME}/.nvm}"
+if [[ -s "${NVM_DIR}/nvm.sh" ]]; then
+    . "${NVM_DIR}/nvm.sh"
+fi
+export PATH="${HOME}/.local/bin:${PATH}"
+
+bridge_package="$(npm root -g)/@ccpocket/bridge/dist/cli.js"
+if [[ ! -f "$bridge_package" ]]; then
+    echo "CC Pocket Bridge is missing; install @ccpocket/bridge in the active Node environment." >&2
+    exit 1
+fi
+if [[ -z "${BRIDGE_API_KEY:-}" ]]; then
+    echo "BRIDGE_API_KEY must be configured in ~/.config/ccpocket/bridge.env." >&2
+    exit 1
+fi
+
+# Pairing credentials are displayed only by the local pairing command.
+export BRIDGE_DEMO_MODE=1
+exec node "$bridge_package" "$@"

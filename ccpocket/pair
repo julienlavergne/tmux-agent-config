@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -eo pipefail
+umask 077
+
+set -a
+. "${HOME}/.config/ccpocket/bridge.env"
+set +a
+export NVM_DIR="${NVM_DIR:-${HOME}/.nvm}"
+if [[ -s "${NVM_DIR}/nvm.sh" ]]; then
+    . "${NVM_DIR}/nvm.sh"
+fi
+export CCPOCKET_PACKAGE_DIR="$(npm root -g)/@ccpocket/bridge"
+
+node --input-type=module <<'JS'
+import { createRequire } from 'node:module';
+import { mkdirSync, chmodSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+const require = createRequire(join(process.env.CCPOCKET_PACKAGE_DIR, 'package.json'));
+const qr = require('qrcode');
+const { BRIDGE_PUBLIC_WS_URL: address, BRIDGE_API_KEY: token } = process.env;
+if (!address || !token) throw new Error('Configure BRIDGE_PUBLIC_WS_URL and BRIDGE_API_KEY first.');
+const parameters = new URLSearchParams({ url: address, token });
+const link = `ccpocket://connect?${parameters}`;
+const directory = join(homedir(), '.ccpocket');
+mkdirSync(directory, { recursive: true, mode: 0o700 });
+const path = join(directory, 'pairing.png');
+await qr.toFile(path, link, { width: 512, margin: 4 });
+chmodSync(path, 0o600);
+console.log(await qr.toString(link, { type: 'terminal', small: true }));
+console.log(`Pairing QR saved to ${path}`);
+JS
