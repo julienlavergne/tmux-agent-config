@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily agent CLI updates
+
+[Timer]
+OnCalendar=*-*-* 04:00:00 Asia/Shanghai
+RandomizedDelaySec=15min
+Persistent=true
+Unit=update-ai-clis.service
+
+[Install]
+WantedBy=timers.target

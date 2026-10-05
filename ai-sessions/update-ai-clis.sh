@@ -1,69 +1,96 @@
 #!/usr/bin/env bash
-# update-ai-clis.sh — update Claude, Copilot, Codex, and CC Pocket Bridge
+# Update agent CLIs and the installed CC Pocket Bridge without restarting sessions.
+set -eo pipefail
 
-set -euo pipefail
+update_daemon=false
+for argument in "$@"; do
+    case "$argument" in
+        --update-daemon) update_daemon=true ;;
+        --help|-h)
+            echo "Usage: update-ai-clis [--update-daemon]"
+            echo "Updates Claude, stable Copilot, Codex, and CC Pocket Bridge when installed."
+            echo "--update-daemon also replaces the Codex daemon package and may interrupt work."
+            exit 0
+            ;;
+        *) echo "Unknown option: $argument" >&2; exit 2 ;;
+    esac
+done
 
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m'
-
-ok()   { echo -e "${GREEN}✓${NC} $*"; }
-info() { echo -e "${YELLOW}→${NC} $*"; }
-fail() { echo -e "${RED}✗${NC} $*"; }
-
-# ── Claude ────────────────────────────────────────────────────────────────────
-echo
-info "Updating Claude CLI..."
-CLAUDE_BEFORE=$(~/.local/bin/claude --version 2>/dev/null | head -1 || echo "unknown")
-if ~/.local/bin/claude update 2>&1 | grep -qi "already up.to.date\|no update\|latest"; then
-    ok "Claude: already up to date ($CLAUDE_BEFORE)"
-else
-    CLAUDE_AFTER=$(~/.local/bin/claude --version 2>/dev/null | head -1 || echo "unknown")
-    ok "Claude: $CLAUDE_BEFORE → $CLAUDE_AFTER"
+state_dir="${AI_CLIS_STATE_DIR:-${HOME}/.local/state/ai-cli-updates}"
+mkdir -p "$state_dir"
+exec 9>"${state_dir}/update.lock"
+if ! flock -n 9; then
+    echo "An agent CLI update is already running; skipping this invocation."
+    exit 0
 fi
 
-# ── Copilot ───────────────────────────────────────────────────────────────────
-echo
-info "Updating Copilot CLI..."
-COPILOT_BEFORE=$(~/.local/bin/copilot --version 2>/dev/null | head -1 || echo "unknown")
-if ~/.local/bin/copilot /update 2>&1 | grep -qi "already up.to.date\|no update\|latest"; then
-    ok "Copilot: already up to date ($COPILOT_BEFORE)"
-else
-    COPILOT_AFTER=$(~/.local/bin/copilot --version 2>/dev/null | head -1 || echo "unknown")
-    ok "Copilot: $COPILOT_BEFORE → $COPILOT_AFTER"
+# Load nvm before enabling nounset; nvm's startup script uses optional variables.
+export NVM_DIR="${NVM_DIR:-${HOME}/.nvm}"
+if [[ -s "${NVM_DIR}/nvm.sh" ]]; then
+    if ! . "${NVM_DIR}/nvm.sh"; then
+        echo "[WARN] Could not load nvm; trying the existing Node/npm PATH." >&2
+    fi
 fi
+set -u
+bin_dir="${AI_CLIS_BIN_DIR:-${HOME}/.local/bin}"
+export PATH="${bin_dir}:${PATH}"
+failures=()
 
-# ── Codex ─────────────────────────────────────────────────────────────────────
-echo
-info "Updating Codex CLI..."
-export NVM_DIR="${HOME}/.nvm"
-[ -s "${NVM_DIR}/nvm.sh" ] && . "${NVM_DIR}/nvm.sh"
+version_of() {
+    "$1" --version 2>/dev/null | sed -n '1p' || printf 'unknown\n'
+}
 
-CODEX_BEFORE=$(~/.local/bin/codex --version 2>/dev/null || echo "unknown")
-npm update -g @openai/codex 2>&1 | tail -3
-CODEX_AFTER=$(~/.local/bin/codex --version 2>/dev/null || echo "unknown")
-if [[ "$CODEX_BEFORE" == "$CODEX_AFTER" ]]; then
-    ok "Codex: already up to date ($CODEX_BEFORE)"
-else
-    ok "Codex: $CODEX_BEFORE → $CODEX_AFTER"
-fi
+run_update() {
+    local label="$1" binary="$2" before after result
+    shift 2
+    before="$(version_of "$binary")"
+    printf '\n[INFO] Updating %s (%s)...\n' "$label" "$before"
+    if "$@" </dev/null; then
+        after="$(version_of "$binary")"
+        if [[ -z "$after" || "$after" == unknown ]]; then
+            printf '[ERROR] %s update returned success, but the installed CLI could not report its version.\n' "$label" >&2
+            failures+=("$label")
+            return
+        fi
+        if [[ "$before" == "$after" ]]; then
+            printf '[OK] %s: %s\n' "$label" "$after"
+        else
+            printf '[OK] %s: %s -> %s\n' "$label" "$before" "$after"
+        fi
+    else
+        result=$?
+        printf '[ERROR] %s update failed (exit %s); continuing with the other tools.\n' "$label" "$result" >&2
+        failures+=("$label")
+    fi
+}
 
-# ── Codex daemon update ───────────────────────────────────────────────────────
-echo
-info "Updating Codex app-server daemon..."
-if ~/.local/bin/codex app-server daemon update 2>&1 | grep -qi "already\|up.to.date\|no update"; then
-    ok "Codex daemon: already up to date"
-else
-    ok "Codex daemon: updated"
-fi
+update_codex() {
+    local latest installed
+    latest="$(npm view @openai/codex@latest version)" || return
+    installed="$("${bin_dir}/codex" --version)" || return
+    if [[ "$installed" == "codex-cli $latest" ]]; then
+        printf 'Codex already matches the latest release (%s).\n' "$latest"
+        return 0
+    fi
+    npm install -g @openai/codex@latest
+}
 
-echo
+run_update "Claude" "${bin_dir}/claude" "${bin_dir}/claude" update
+run_update "Copilot" "${bin_dir}/copilot" "${bin_dir}/copilot" update stable
+run_update "Codex" "${bin_dir}/codex" update_codex
+
 if npm list -g @ccpocket/bridge --depth=0 >/dev/null 2>&1; then
-    info "Updating CC Pocket Bridge..."
-    npm update -g @ccpocket/bridge 2>&1 | tail -3
-    ok "CC Pocket Bridge package updated; restart ccpocket-bridge when ready."
+    run_update "CC Pocket Bridge" ccpocket-bridge npm update -g @ccpocket/bridge
 fi
 
-echo
-ok "All done."
+if [[ "$update_daemon" == true ]]; then
+    run_update "Codex daemon package" "${bin_dir}/codex" "${bin_dir}/codex" app-server daemon update --from-cli --yes
+else
+    echo "[INFO] Running agents and the Codex daemon are not restarted. Use --update-daemon when ready to replace the daemon package."
+fi
+
+if ((${#failures[@]})); then
+    printf '\n[ERROR] Updates failed for: %s\n' "${failures[*]}" >&2
+    exit 1
+fi
+printf '\n[OK] All requested package updates completed.\n'

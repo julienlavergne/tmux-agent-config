@@ -29,7 +29,8 @@ live config updates immediately (and is already tracked by git).
 | `ai-sessions/profiles/desktop/*.env` | `~/.config/ai-sessions/*.env` *(with `--sessions desktop`)* | Desktop session definitions; installation does not start or restart sessions. |
 | `ai-sessions/profiles/desktop/enabled-sessions.txt` | *(restoration inventory)* | Names of enabled desktop AI-session services. |
 | `ai-sessions/restart-ai-sessions` | `~/.local/bin/restart-ai-sessions` | Restarts `ai-session@` systemd units on this host — all of them, or specific names passed as arguments. |
-| `ai-sessions/update-ai-clis.sh` | `~/.local/bin/update-ai-clis`, `~/update-ai-clis.sh` | Updates Claude, Copilot, Codex, the Codex app-server daemon, and CC Pocket Bridge when installed. The home-directory link preserves the original invocation. |
+| `ai-sessions/update-ai-clis.sh` | `~/.local/bin/update-ai-clis`, `~/update-ai-clis.sh` | Updates Claude, stable Copilot, Codex and installed CC Pocket Bridge. Optional `--update-daemon` replaces the Codex daemon package. |
+| `ai-sessions/update-ai-clis.service`, `update-ai-clis.timer` | `~/.config/systemd/user/update-ai-clis.{service,timer}` | Daily package updates around 04:00 China time, with journal logs and missed-run catch-up. |
 | `ccpocket/ccpocket-bridge.service` | `~/.config/systemd/user/ccpocket-bridge.service` | Persistent authenticated CC Pocket Bridge service. |
 | `ccpocket/start-bridge` | `~/.local/bin/start-ccpocket-bridge` | Launches the installed Bridge in the active Node environment without printing pairing credentials in service logs. |
 | `ccpocket/pair` | `~/.local/bin/ccpocket-pair` | Displays a local pairing QR and saves it to `~/.ccpocket/pairing.png`. |
@@ -82,6 +83,25 @@ Once you've confirmed the symlinked config works, remove the backups:
 
 This finds every `<path>.bak-*` left by past installs and deletes them after
 a confirmation prompt — no need to hunt them down by hand on each machine.
+
+## Agent CLI updates
+
+Run `update-ai-clis` or `~/update-ai-clis.sh` to update Claude through its configured release channel, Copilot through its stable channel, Codex to the latest npm release, and CC Pocket Bridge if installed. A lock prevents overlapping manual and scheduled runs. Failed updates are reported, the other tools are still attempted, and the script exits nonzero if any update failed.
+
+Enable the daily schedule after installation:
+
+```bash
+systemctl --user enable --now update-ai-clis.timer
+```
+
+The timer runs between 04:00 and 04:15 Asia/Shanghai, and catches up a missed run when the user service manager next starts. Lingering keeps the user timer available after logout; this desktop already has it enabled. Inspect the next run and recent output with:
+
+```bash
+systemctl --user list-timers update-ai-clis.timer
+journalctl --user -u update-ai-clis.service -n 100 --no-pager
+```
+
+The daily job does not restart agent sessions, the Codex daemon, or CC Pocket Bridge. Running processes retain their current versions until restarted. When ready to replace the Codex daemon package explicitly, run `update-ai-clis --update-daemon`; that operation may interrupt running Codex work.
 
 ## Per-machine session setup
 

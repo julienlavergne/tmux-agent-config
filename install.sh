@@ -55,6 +55,8 @@ LINKS=(
     "ai-sessions/restart-ai-sessions|${HOME}/.local/bin/restart-ai-sessions"
     "ai-sessions/update-ai-clis.sh|${HOME}/.local/bin/update-ai-clis"
     "ai-sessions/update-ai-clis.sh|${HOME}/update-ai-clis.sh"
+    "ai-sessions/update-ai-clis.service|${HOME}/.config/systemd/user/update-ai-clis.service"
+    "ai-sessions/update-ai-clis.timer|${HOME}/.config/systemd/user/update-ai-clis.timer"
 )
 
 seed_codex_config() {
