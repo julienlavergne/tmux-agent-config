@@ -35,6 +35,7 @@ set -u
 bin_dir="${AI_CLIS_BIN_DIR:-${HOME}/.local/bin}"
 export PATH="${bin_dir}:${PATH}"
 failures=()
+version_summary=()
 
 version_of() {
     "$1" --version 2>/dev/null | sed -n '1p' || printf 'unknown\n'
@@ -57,6 +58,7 @@ run_update() {
         else
             printf '[OK] %s: %s -> %s\n' "$label" "$before" "$after"
         fi
+        version_summary+=("$label: $after")
     else
         result=$?
         printf '[ERROR] %s update failed (exit %s); continuing with the other tools.\n' "$label" "$result" >&2
@@ -93,4 +95,6 @@ if ((${#failures[@]})); then
     printf '\n[ERROR] Updates failed for: %s\n' "${failures[*]}" >&2
     exit 1
 fi
+printf '\nInstalled CLI versions:\n'
+printf '  %s\n' "${version_summary[@]}"
 printf '\n[OK] All requested package updates completed.\n'

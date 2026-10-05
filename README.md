@@ -86,7 +86,7 @@ a confirmation prompt — no need to hunt them down by hand on each machine.
 
 ## Agent CLI updates
 
-Run `update-ai-clis` or `~/update-ai-clis.sh` to update Claude through its configured release channel, Copilot through its stable channel, Codex to the latest npm release, and CC Pocket Bridge if installed. A lock prevents overlapping manual and scheduled runs. Failed updates are reported, the other tools are still attempted, and the script exits nonzero if any update failed.
+Run `update-ai-clis` or `~/update-ai-clis.sh` to update Claude through its configured release channel, Copilot through its stable channel, Codex to the latest npm release, and CC Pocket Bridge if installed. The run ends with a version summary for each successfully updated package. A lock prevents overlapping manual and scheduled runs. Failed updates are reported, the other tools are still attempted, and the script exits nonzero if any update failed.
 
 Enable the daily schedule after installation:
 
