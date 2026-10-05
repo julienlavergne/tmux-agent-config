@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//etc/**)",
+      "Read(//usr/**)",
+      "Read(//opt/**)"
+    ]
+  }
+}

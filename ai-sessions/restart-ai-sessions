@@ -39,6 +39,13 @@ printf '  %s\n' "${units[@]}"
 
 systemctl --user restart "${units[@]}"
 
+# Restart the codex remote-control daemon if any codex sessions were restarted,
+# so it reconnects to the fresh sessions.
+if printf '%s\n' "${units[@]}" | grep -q 'codex'; then
+    systemctl --user restart codex-remote-control.service 2>/dev/null \
+        && echo "Restarted codex-remote-control.service"
+fi
+
 echo
 echo "Done. Current state:"
 systemctl --user list-units 'ai-session@*.service' --all --no-pager --no-legend

@@ -1,0 +1,11 @@
+[Unit]
+Description=Codex Remote Control Daemon
+After=default.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/codex remote-control start
+RemainAfterExit=yes
+
+[Install]
+WantedBy=default.target

@@ -12,13 +12,24 @@ live config updates immediately (and is already tracked by git).
 | `tmux/tmux.conf` | `~/.tmux.conf` | Mouse support, clipboard integration, vi copy-mode, scrollback, window titles. |
 | `tmux/tmux-picker` | `~/.local/bin/tmux-picker` | Login-shell picker: attach/create/delete tmux sessions interactively on login. Uses `fzf` for fuzzy search when it's installed, falls back to a plain numbered menu (no dependencies beyond bash + tmux) when it isn't. |
 | `claude/settings.json` | `~/.claude/settings.json` | Claude Code permission allowlist, statusline wiring, theme/notification prefs. |
+| `claude/settings.local.json` | `~/.claude/settings.local.json` | Additional local filesystem read permissions. |
+| `codex/config.toml` | `~/.codex/config.toml` *(copied only when absent)* | Codex model, reasoning, sandbox, service tier, terminal status-line and plugin preferences. |
+| `codex/profiles/desktop.toml` | *(snapshot, not linked)* | Full desktop Codex configuration, including project trust, local marketplace paths and approved hook hashes. |
+| `codex/launcher` | `~/.local/bin/codex` | Launches Codex from the active nvm Node installation without pinning a Node version path. |
 | `shared/AGENTS.md` | `~/.codex/AGENTS.md`, `~/.claude/rules/preferences.md` | Shared personal instructions: candid mentoring, environment, tooling, concise answers, questions, content style, and feature quality. |
 | `claude/CLAUDE.md` | `~/.claude/CLAUDE.md` | Claude-specific instructions: tmux sessions, worktree isolation, multi-agent feature workflow, and codebase navigation. |
 | `claude/rules/common.md` | `~/.claude/rules/common.md` | Engineering rules (code quality, security, testing, git, review) auto-loaded by Claude Code. |
 | `claude/rules/python.md` | `~/.claude/rules/python.md` | Python-specific conventions, auto-loaded by Claude Code. |
+| `claude/rules/cpp.md`, `dart.md`, `rust.md` | `~/.claude/rules/<language>.md` | C++, Dart/Flutter and Rust instructions, loaded for matching files. |
 | `claude/statusline/statusline.sh` | `~/.claude/claude-cli-status/statusline.sh` | Custom statusline: project/branch, model, context usage bar, token counts, cost, rate limits. |
-| `ai-sessions/ai-session@.service` | `~/.config/systemd/user/ai-session@.service` | systemd user template unit that keeps a named tmux session alive running `claude` or `copilot`. |
+| `ai-sessions/ai-session@.service` | `~/.config/systemd/user/ai-session@.service` | systemd user template unit that keeps a named tmux session alive running `claude`, `copilot`, or `codex`. |
 | `ai-sessions/ai-session-watch` | `~/.local/bin/ai-session-watch` | Watcher script the unit runs: creates the tmux session if missing, resumes the most recent matching transcript, respawns on crash. |
+| `ai-sessions/ai-session-codex`, `ai-session-copilot` | *(loaded beside the watcher)* | Python helpers that preserve each service's foreground conversation identity. |
+| `ai-sessions/codex-remote-control.service` | `~/.config/systemd/user/codex-remote-control.service` | Starts the Codex remote-control daemon. |
+| `ai-sessions/profiles/desktop/*.env` | `~/.config/ai-sessions/*.env` *(with `--sessions desktop`)* | Desktop session definitions; installation does not start or restart sessions. |
+| `ai-sessions/profiles/desktop/enabled-sessions.txt` | *(restoration inventory)* | Names of enabled desktop AI-session services. |
+| `ai-sessions/restart-ai-sessions` | `~/.local/bin/restart-ai-sessions` | Restarts `ai-session@` systemd units on this host — all of them, or specific names passed as arguments. |
+| `ai-sessions/update-ai-clis.sh` | `~/.local/bin/update-ai-clis`, `~/update-ai-clis.sh` | Updates Claude, Copilot, Codex, and the Codex app-server daemon. The home-directory link preserves the original invocation. |
 | `ai-sessions/env.example` | *(not symlinked — a template)* | Per-session `CWD`/`AGENT` env file format consumed by the systemd unit. |
 
 ## Install (this machine or a new one)
@@ -50,10 +61,14 @@ fi
 UI) — `tmux-picker` falls back to a plain numbered menu with the same
 attach/create/delete behavior when it isn't installed.
 
-`install.sh` symlinks every path above into place. If a real file already
+`install.sh` installs the paths marked as linked or copied above. If a real file already
 exists at a target, it's backed up to `<path>.bak-<timestamp>` first — safe
 to re-run any time. It also runs `systemctl --user daemon-reload` if
 `systemctl` is available.
+
+Codex's `config.toml` remains a regular machine-local file because it also stores project trust and generated state. Installation copies the personal defaults only when the file is absent and preserves an existing configuration. The full desktop snapshot lives in `codex/profiles/desktop.toml`; review local paths and trust entries before restoring it on another machine. To refresh that snapshot from the desktop, copy `~/.codex/config.toml` to `codex/profiles/desktop.toml`.
+
+The Codex launcher requires Node and npm, normally provided by nvm, and an installed `@openai/codex` package in the active Node environment. Installation links configuration and scripts; it does not install or update agent binaries.
 
 Once you've confirmed the symlinked config works, remove the backups:
 
@@ -66,6 +81,21 @@ a confirmation prompt — no need to hunt them down by hand on each machine.
 
 ## Per-machine session setup
 
+To link the saved desktop definitions without starting or restarting any session:
+
+```bash
+~/workspace/tmux-agent-config/install.sh --sessions desktop
+```
+
+After checking workspace paths, restore the enabled desktop services explicitly:
+
+```bash
+while IFS= read -r session_name; do
+    systemctl --user enable --now "ai-session@${session_name}.service"
+done < ~/workspace/tmux-agent-config/ai-sessions/profiles/desktop/enabled-sessions.txt
+systemctl --user enable --now codex-remote-control.service
+```
+
 The systemd unit and watcher script are generic, but *which* sessions run is
 per-machine (different projects live on different boxes). For each session:
 
@@ -77,12 +107,64 @@ systemctl --user enable --now ai-session@<device>-<foldername>-<agent>.service
 
 Session names follow `<device>-<foldername>-<agent>` (see `CLAUDE.md`):
 `device` is `desktop` or `laptop`, `foldername` is the working directory's
-basename, `agent` is `claude` or `copilot`. This keeps the tmux session name,
+basename, `agent` is `claude`, `copilot`, or `codex`. This keeps the tmux session name,
 the systemd instance name, and the Claude Code `--rc` remote-control title in
 sync so sessions are recognizable from FleetView / Remote Control on Android.
 
 ## What's deliberately *not* here
 
-- `~/.config/ai-sessions/*.env` — per-machine, points at local project paths.
+- Unrecorded `~/.config/ai-sessions/*.env` — per-machine definitions; saved desktop definitions live in `ai-sessions/profiles/desktop/`.
 - `~/.claude.json`, `~/.claude/.credentials.json` — session/auth state, not config.
+- `~/.codex/auth.json`, conversation databases, transcripts, logs and `~/.local/state/ai-sessions/` UUID mappings — credentials and runtime state.
 - Anything under `~/.claude/projects/` (including the memory system) — conversation history and learned memory, not portable setup.
+
+### Codex conversation persistence
+
+Codex services use `ai-sessions/ai-session-codex`, located beside the watcher
+(the watcher symlink resolves to this repository). Python 3 is required. Claude
+keeps its existing resume behavior. Codex UUIDs are saved in
+`~/.local/state/ai-sessions/<service-name>.codex-id`; keep these files across
+restarts. The helper reads Codex's local thread database without modifying it.
+On first launch it adopts a matching named conversation, or the most recent
+unclaimed conversation in a workspace used by only one Codex service. Shared
+workspaces start separate conversations and track their own process files.
+Fresh conversations are recorded once Codex creates the thread; folder trust
+prompts must be accepted before that can happen. Missing or archived saved
+conversations fail explicitly rather than silently losing history.
+
+The Codex helper keeps monitoring the launched TUI and its descendants via Linux
+`/proc`. It follows newly opened interactive rollout files after `/clear` or
+`/new`, updating the service UUID while excluding other services and subagents.
+Previous conversations remain saved in Codex but are not resumed by this service.
+
+### Copilot conversation persistence
+
+Copilot services use the adjacent `ai-sessions/ai-session-copilot` helper
+(Python 3). It saves the foreground conversation UUID in
+`~/.local/state/ai-sessions/<service-name>.copilot-id` and resumes that exact
+conversation. Initial named-session lookup reads `workspace.yaml` for sessions
+indexed in Copilot's database, rather than relying on `session_refs` names.
+The helper follows foreground registration messages in isolated per-launch
+process logs under `<service-name>.copilot-logs/`, including `/clear`, `/new`,
+and `/resume`. It waits for previous session holders to exit before resuming.
+Missing saved conversations fail explicitly. Copilot's database and transcripts
+are not modified by the helper. The watcher resolves both Python helpers next
+to its repository source, so the existing installer symlink includes them.
+
+Codex AI services launch with `--sandbox danger-full-access --ask-for-approval
+never` for full access without approval prompts. Copilot services launch with
+`--yolo --remote`. Codex remote control uses the enabled user daemon service.
+
+Codex entries with no rollout or recorded turns start fresh on restart. The helper also tracks open thread-writer locks for
+paginated history, which may not have a legacy rollout file. An empty saved
+conversation never falls back to an older conversation from before `/clear`.
+
+Interactive Codex recovery includes CLI and VS Code conversations. If a saved
+UUID is empty, a service with a unique workspace may adopt a newer populated
+conversation in that workspace (for example one created in VS Code). It never
+adopts a conversation older than that empty UUID, preserving `/clear` semantics.
+Services sharing a workspace retain their separate UUID mappings.
+
+Codex conversation discovery uses `thread_source=user` rather than the mutable
+client `source` label. Opening a conversation through another client must not
+exclude its UUID from recovery; guardian threads remain excluded.

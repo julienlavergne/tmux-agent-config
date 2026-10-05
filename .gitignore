@@ -1,0 +1,12 @@
+# Machine-generated state and credentials are not configuration.
+*.bak-*
+__pycache__/
+*.py[cod]
+auth.json
+.credentials.json
+*.sqlite*
+*.db*
+*.jsonl
+*.codex-id
+*.copilot-id
+*.log

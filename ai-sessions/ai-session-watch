@@ -1,5 +1,5 @@
 #!/bin/bash
-# Unified AI session watcher — maintains a named tmux pane for claude or copilot.
+# Unified AI session watcher — maintains a named tmux pane for claude, copilot, or codex.
 
 NAME="$1"
 CWD="$2"
@@ -7,7 +7,9 @@ AGENT="$3"
 
 CLAUDE="${HOME}/.local/bin/claude"
 COPILOT="${HOME}/.local/bin/copilot"
+CODEX="${HOME}/.local/bin/codex"
 DB="${HOME}/.copilot/session-store.db"
+CODEX_SESSIONS_DIR="${HOME}/.codex/sessions"
 PROJECT_DIR="${HOME}/.claude/projects/$(echo "${CWD}" | sed 's|/|-|g')"
 
 make_claude_cmd() {
@@ -35,21 +37,24 @@ make_claude_cmd() {
 }
 
 make_copilot_cmd() {
-    local count
-    count=$(sqlite3 "${DB}" \
-        "SELECT COUNT(*) FROM session_refs WHERE ref_type='name' AND ref_value='${NAME}'" \
-        2>/dev/null)
-    if [[ "${count}" -gt 0 ]]; then
-        echo "${COPILOT} --yolo --resume=${NAME} --remote"
-    else
-        echo "${COPILOT} --yolo --name ${NAME} --remote"
-    fi
+    local helper
+    helper="$(dirname "$(readlink -f "$0")")/ai-session-copilot"
+    printf 'python3 %q %q %q' "${helper}" "${NAME}" "${CWD}"
+}
+
+make_codex_cmd() {
+    # Keep Codex's UUID under the same service name used by Claude/Copilot.
+    # Resolve the helper beside the actual watcher, including symlink installs.
+    local helper
+    helper="$(dirname "$(readlink -f "$0")")/ai-session-codex"
+    printf 'python3 %q %q %q' "${helper}" "${NAME}" "${CWD}"
 }
 
 make_cmd() {
     case "${AGENT}" in
         claude)  make_claude_cmd ;;
         copilot) make_copilot_cmd ;;
+        codex)   make_codex_cmd ;;
     esac
 }
 

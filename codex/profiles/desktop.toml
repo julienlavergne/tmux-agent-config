@@ -1,0 +1,35 @@
+model = "gpt-6.1-sol"
+model_reasoning_effort = "high"
+sandbox_mode = "danger-full-access"
+model_context_window = 1050000
+model_auto_compact_token_limit = 900000
+service_tier = "fast"
+[tui]
+screen_reader_detection_done = true
+status_line = ["model-with-reasoning", "current-dir", "git-branch", "branch-changes", "run-state", "context-remaining", "five-hour-limit", "weekly-limit", "fast-mode"]
+status_line_use_colors = true
+
+[tui.model_availability_nux]
+"gpt-6.1-sol" = 4
+
+[projects."/home/julien/workspace/pure"]
+trust_level = "trusted"
+
+[projects."/home/julien/workspace/sunder-forge/sunder-forge"]
+trust_level = "trusted"
+
+[projects."/home/julien/workspace/weight-coach"]
+trust_level = "trusted"
+
+[marketplaces.openai-bundled]
+source_type = "local"
+source = "/home/julien/.codex/.tmp/bundled-marketplaces/openai-bundled"
+
+[plugins."visualize@openai-bundled"]
+enabled = true
+
+[hooks.state."/home/julien/workspace/sunder-forge/sunder-forge/.codex/hooks.json:pre_tool_use:0:0"]
+trusted_hash = "sha256:14a8c7e58ebcc98d77e9948f8ed8fd4521a72408c0215d127c7b9df33efe9648"
+
+[hooks.state."/home/julien/workspace/sunder-forge/sunder-forge/.codex/hooks.json:stop:0:0"]
+trusted_hash = "sha256:692d8c983ac28788c9e6922821bdb186420968c0e6c571edf6fbd76b48e57d16"

@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Launch the Codex CLI installed in the active nvm Node environment.
+set -eo pipefail
+
+export NVM_DIR="${NVM_DIR:-${HOME}/.nvm}"
+if [[ -s "${NVM_DIR}/nvm.sh" ]]; then
+    . "${NVM_DIR}/nvm.sh"
+fi
+
+codex_package="$(npm root -g)/@openai/codex/bin/codex.js"
+if [[ ! -f "$codex_package" ]]; then
+    echo "Codex is not installed in the active Node environment: $codex_package" >&2
+    exit 1
+fi
+
+exec node "$codex_package" "$@"

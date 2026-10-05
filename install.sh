@@ -10,6 +10,9 @@
 #
 #  Usage:
 #    ./install.sh                 Link config into place (default)
+#    ./install.sh --sessions desktop
+#                                Also link saved session definitions; does not
+#                                start or restart services.
 #    ./install.sh --clean-backups Remove .bak-<timestamp> files left by past
 #                                  installs, once you've verified the symlinked
 #                                  config works. Prompts for confirmation.
@@ -32,16 +35,50 @@ LINKS=(
     "tmux/tmux.conf|${HOME}/.tmux.conf"
     "tmux/tmux-picker|${HOME}/.local/bin/tmux-picker"
     "claude/settings.json|${HOME}/.claude/settings.json"
+    "claude/settings.local.json|${HOME}/.claude/settings.local.json"
     "claude/CLAUDE.md|${HOME}/.claude/CLAUDE.md"
+    "codex/launcher|${HOME}/.local/bin/codex"
     "shared/AGENTS.md|${HOME}/.codex/AGENTS.md"
     "shared/AGENTS.md|${HOME}/.claude/rules/preferences.md"
     "claude/rules/common.md|${HOME}/.claude/rules/common.md"
     "claude/rules/python.md|${HOME}/.claude/rules/python.md"
+    "claude/rules/cpp.md|${HOME}/.claude/rules/cpp.md"
+    "claude/rules/dart.md|${HOME}/.claude/rules/dart.md"
+    "claude/rules/rust.md|${HOME}/.claude/rules/rust.md"
     "claude/statusline/statusline.sh|${HOME}/.claude/claude-cli-status/statusline.sh"
     "ai-sessions/ai-session@.service|${HOME}/.config/systemd/user/ai-session@.service"
+    "ai-sessions/codex-remote-control.service|${HOME}/.config/systemd/user/codex-remote-control.service"
     "ai-sessions/ai-session-watch|${HOME}/.local/bin/ai-session-watch"
     "ai-sessions/restart-ai-sessions|${HOME}/.local/bin/restart-ai-sessions"
+    "ai-sessions/update-ai-clis.sh|${HOME}/.local/bin/update-ai-clis"
+    "ai-sessions/update-ai-clis.sh|${HOME}/update-ai-clis.sh"
 )
+
+seed_codex_config() {
+    local dst="${HOME}/.codex/config.toml"
+    if [[ -e "$dst" || -L "$dst" ]]; then
+        echo -e "  ${GREEN}keep${NC} $dst (existing machine configuration)"
+        return
+    fi
+    mkdir -p "$(dirname "$dst")"
+    cp "${REPO_DIR}/codex/config.toml" "$dst"
+    chmod 600 "$dst"
+    echo -e "  ${GREEN}copied${NC} $dst (personal defaults; machine state stays local)"
+}
+
+link_session_profile() {
+    local device="$1"
+    if [[ ! "$device" =~ ^[a-z0-9-]+$ || ! -d "${REPO_DIR}/ai-sessions/profiles/${device}" ]]; then
+        echo "Unknown session profile: $device" >&2
+        return 1
+    fi
+    local src
+    for src in "${REPO_DIR}/ai-sessions/profiles/${device}"/*.env; do
+        [[ -f "$src" ]] || continue
+        link_one "ai-sessions/profiles/${device}/$(basename "$src")" "${HOME}/.config/ai-sessions/$(basename "$src")"
+    done
+    echo "Session definitions linked; services were not started or restarted."
+}
 
 link_one() {
     local src="${REPO_DIR}/$1"
@@ -74,8 +111,9 @@ do_install() {
     for pair in "${LINKS[@]}"; do
         link_one "${pair%%|*}" "${pair##*|}"
     done
+    seed_codex_config
 
-    chmod +x "${REPO_DIR}/tmux/tmux-picker" "${REPO_DIR}/claude/statusline/statusline.sh" "${REPO_DIR}/ai-sessions/ai-session-watch" "${REPO_DIR}/ai-sessions/restart-ai-sessions"
+    chmod +x "${REPO_DIR}/tmux/tmux-picker" "${REPO_DIR}/claude/statusline/statusline.sh" "${REPO_DIR}/codex/launcher" "${REPO_DIR}/ai-sessions/ai-session-watch" "${REPO_DIR}/ai-sessions/ai-session-codex" "${REPO_DIR}/ai-sessions/ai-session-copilot" "${REPO_DIR}/ai-sessions/restart-ai-sessions" "${REPO_DIR}/ai-sessions/update-ai-clis.sh"
 
     if command -v systemctl >/dev/null 2>&1; then
         systemctl --user daemon-reload
@@ -118,9 +156,17 @@ do_clean_backups() {
 
 case "${1:-}" in
     --clean-backups) do_clean_backups ;;
+    --sessions)
+        if [[ $# -ne 2 || ! "${2:-}" =~ ^[a-z0-9-]+$ || ! -d "${REPO_DIR}/ai-sessions/profiles/${2:-}" ]]; then
+            echo "Usage: $0 --sessions <device-with-saved-profile>" >&2
+            exit 1
+        fi
+        do_install
+        link_session_profile "$2"
+        ;;
     "")              do_install ;;
     *)
-        echo "Usage: $0 [--clean-backups]"
+        echo "Usage: $0 [--clean-backups | --sessions <device>]"
         exit 1
         ;;
 esac

@@ -1,0 +1,140 @@
+#!/usr/bin/env python3
+"""Persist Codex conversation IDs per named AI service, without editing Codex state."""
+import os
+from pathlib import Path
+import signal
+import sqlite3
+import subprocess
+import sys
+import time
+
+
+def threads(home):
+    db = home / "state_5.sqlite"
+    if not db.exists():
+        return []
+    with sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=5) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = [dict(row) for row in conn.execute(
+            "SELECT id, cwd, name, archived, created_at_ms, created_at, has_user_event, rollout_path FROM threads WHERE thread_source='user' "
+            "ORDER BY updated_at DESC")]
+
+    # Paginated history can contain messages even when has_user_event is zero.
+    history = home / "thread_history_1.sqlite"
+    populated = set()
+    if history.exists():
+        with sqlite3.connect(f"file:{history}?mode=ro", uri=True, timeout=5) as conn:
+            populated = {r[0] for r in conn.execute(
+                "SELECT DISTINCT thread_id FROM thread_turns WHERE first_user_item_id IS NOT NULL")}
+    for row in rows:
+        row["has_user_event"] = bool(row["has_user_event"] or
+                                     row["id"] in populated or
+                                     Path(row["rollout_path"]).is_file())
+    return rows
+
+
+def select(rows, name, cwd, saved, claimed, shared):
+    if saved:
+        matches = [r for r in rows if r["id"] == saved]
+        if not matches or matches[0]["archived"]:
+            raise RuntimeError("Saved Codex conversation is missing or archived; refusing to replace it")
+        if matches[0]["cwd"] != cwd:
+            raise RuntimeError("Saved Codex conversation belongs to a different workspace")
+        # Codex records empty threads before any resumable history exists.
+        # Start fresh for these, including a /clear followed by a restart.
+        if matches[0]["has_user_event"]:
+            return saved
+        # A newer interactive thread may have been opened through the IDE or
+        # remote control, outside the local TUI process. Do not resurrect an
+        # older conversation when the saved empty thread came from /clear.
+        if not shared:
+            saved_created = matches[0]["created_at_ms"] or matches[0]["created_at"] * 1000
+            return next((r["id"] for r in rows if r["cwd"] == cwd
+                         and not r["archived"] and r["has_user_event"]
+                         and r["id"] not in claimed
+                         and (r["created_at_ms"] or r["created_at"] * 1000) > saved_created), None)
+        return None
+    named = [r for r in rows if r["name"] == name and not r["archived"] and r["has_user_event"]]
+    if named:
+        return named[0]["id"]
+    if not shared:
+        return next((r["id"] for r in rows if r["cwd"] == cwd
+                     and not r["archived"] and r["has_user_event"] and r["id"] not in claimed), None)
+    return None
+
+
+def owned_conversation(pid, rows, cwd):
+    """Only consider rollout files opened by this TUI and its descendants."""
+    pending = [pid]
+    paths = set()
+    while pending:
+        current = pending.pop()
+        proc = Path("/proc") / str(current)
+        try:
+            pending.extend(int(value) for value in
+                           (proc / "task" / str(current) / "children").read_text().split())
+            for fd in (proc / "fd").iterdir():
+                try:
+                    target = Path(os.readlink(fd))
+                    if target.name.startswith("rollout-") and target.suffix == ".jsonl":
+                        paths.add(target.name)
+                    elif target.parent.name == "thread-writer-locks" and target.suffix == ".lock":
+                        paths.add(target.name)
+                except OSError:
+                    pass
+        except (FileNotFoundError, ProcessLookupError):
+            pass
+    candidates = [row for row in rows if row["cwd"] == cwd and not row["archived"]
+                  and any((path.endswith(row["id"] + ".jsonl") or path == row["id"] + ".lock") for path in paths)]
+    # /clear can leave the previous rollout open; the new conversation is newer.
+    return max(candidates, key=lambda row: row["created_at_ms"] or
+               row["created_at"] * 1000)["id"] if candidates else None
+
+
+def main():
+    name, cwd = sys.argv[1:]
+    home = Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex")))
+    state = Path.home() / ".local/state/ai-sessions"
+    state.mkdir(parents=True, exist_ok=True)
+    mapping = state / (name + ".codex-id")
+    rows = threads(home)
+    saved = mapping.read_text().strip() if mapping.exists() else None
+    claimed = {p.read_text().strip() for p in state.glob("*.codex-id")}
+    peers = 0
+    for env in (Path.home() / ".config/ai-sessions").glob("*.env"):
+        values = dict(line.split("=", 1) for line in env.read_text().splitlines()
+                      if "=" in line and not line.lstrip().startswith("#"))
+        if values.get("AGENT") == "codex" and values.get("CWD") == cwd:
+            peers += 1
+    session = select(rows, name, cwd, saved, claimed, peers > 1)
+    def persist(session_id):
+        temp = mapping.with_suffix(".tmp")
+        temp.write_text(session_id + "\n")
+        temp.replace(mapping)
+        with (state / (name + ".log")).open("a") as log:
+            log.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')}: conversation {session_id}\n")
+    cmd = [str(Path.home() / ".local/bin/codex")]
+    if session:
+        persist(session)
+        cmd += ["resume", session]
+    child = subprocess.Popen(cmd + ["--sandbox", "danger-full-access",
+                                    "--ask-for-approval", "never", "-C", cwd])
+    def forward(signum, frame):
+        child.send_signal(signum)
+    signal.signal(signal.SIGTERM, forward)
+    signal.signal(signal.SIGINT, forward)
+    while child.poll() is None:
+        current = owned_conversation(child.pid, threads(home), cwd)
+        if current and current != session:
+            persist(current)
+            session = current
+        time.sleep(5)
+    sys.exit(child.wait())
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (RuntimeError, sqlite3.Error) as exc:
+        print(f"AI session resume error: {exc}", file=sys.stderr)
+        sys.exit(1)
