@@ -152,7 +152,11 @@ The desktop's advertised endpoint is `ws://100.121.101.37:8765`, its NordVPN Mes
 
 The home-LAN endpoint `ws://192.168.77.2:8765` also remains available while on that network. The QR includes the authentication key and uses `BRIDGE_PUBLIC_WS_URL` from the local configuration. Regenerate it with `ccpocket-pair` after changing the key or address.
 
-Use `systemctl --user restart ccpocket-bridge` after configuration or package updates, and `systemctl --user status ccpocket-bridge` or `journalctl --user -u ccpocket-bridge` to inspect it. The bridge preserves the existing CLI services; it manages its own sessions. `update-ai-clis` updates the installed Bridge package without restarting active sessions.
+Use `systemctl --user restart ccpocket-bridge` after configuration or package updates, and `systemctl --user status ccpocket-bridge` or `journalctl --user -u ccpocket-bridge` to inspect it. `update-ai-clis` updates the installed Bridge package without restarting active sessions.
+
+On this desktop, CC Pocket connects to the existing Codex app/IDE daemon using `BRIDGE_CODEX_APP_SERVER_MODE=external` and a `ws+unix://<socket-path>:/` URL in the private local environment file. Codex's Unix endpoint accepts WebSocket connections; CC Pocket's WebSocket client supports this local transport. Sharing the same daemon lets CC Pocket resume threads owned by that daemon without creating a competing writer. The launcher ensures the daemon is running before starting the Bridge. Locate the active control socket with `ss -lxnp`; it is under `/tmp/codex-daemon-<uid>/`. This connection remains local; the phone continues to use the authenticated Meshnet bridge endpoint.
+
+This integration has been verified with Codex 0.160.0 and Bridge 1.88.0. Threads owned by an independent Codex process still require a handoff. For a terminal client joining the desktop daemon, use `codex resume <thread-id> --remote unix://`.
 
 For CC Pocket's SSH start/stop controls on the desktop, use host `100.121.101.37`, port `22`, username `julien`, and private-key authentication. The dedicated phone key is `~/.ssh/ccpocket-phone.pem`, in RSA PEM format with no passphrase; its public key is authorized on the desktop. Import that private file into the phone's SSH credentials. Private keys and `authorized_keys` remain outside this repository. The service's explicit `/bin/bash` launcher supports CC Pocket's SSH startup preflight.
 

@@ -17,6 +17,10 @@ if [[ -z "${BRIDGE_API_KEY:-}" ]]; then
     exit 1
 fi
 
+if [[ "${BRIDGE_CODEX_APP_SERVER_MODE:-}" == external && "${BRIDGE_CODEX_SHARED_APP_SERVER_URL:-}" == ws+unix://* ]]; then
+    "${HOME}/.local/bin/codex" app-server daemon start >/dev/null
+fi
+
 # Pairing credentials are displayed only by the local pairing command.
 export BRIDGE_DEMO_MODE=1
 exec node "$bridge_package" "$@"
