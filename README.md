@@ -13,8 +13,8 @@ live config updates immediately (and is already tracked by git).
 | `tmux/tmux-picker` | `~/.local/bin/tmux-picker` | Login-shell picker: attach/create/delete tmux sessions interactively on login. Uses `fzf` for fuzzy search when it's installed, falls back to a plain numbered menu (no dependencies beyond bash + tmux) when it isn't. |
 | `claude/settings.json` | `~/.claude/settings.json` | Claude Code permission allowlist, statusline wiring, theme/notification prefs. |
 | `claude/settings.local.json` | `~/.claude/settings.local.json` | Additional local filesystem read permissions. |
-| `codex/config.toml` | `~/.codex/config.toml` *(copied only when absent)* | Codex model, reasoning, sandbox, service tier, terminal status-line and plugin preferences. |
-| `codex/profiles/desktop.toml` | *(snapshot, not linked)* | Full desktop Codex configuration, including project trust, local marketplace paths and approved hook hashes. |
+| `codex/config.toml` | `~/.codex/config.toml` *(copied only when absent)* | Codex model, reasoning, sandbox, service tier, terminal status-line, plugins and normal-mode structured questions. |
+| `codex/profiles/desktop.toml` | *(snapshot, not linked)* | Full desktop Codex configuration, including structured questions, project trust, local marketplace paths and approved hook hashes. |
 | `codex/launcher` | `~/.local/bin/codex` | Launches Codex from the active nvm Node installation without pinning a Node version path. |
 | `shared/AGENTS.md` | `~/.codex/AGENTS.md`, `~/.claude/rules/preferences.md` | Shared personal instructions: candid mentoring, environment, tooling, concise answers, questions, content style, and feature quality. |
 | `claude/CLAUDE.md` | `~/.claude/CLAUDE.md` | Claude-specific instructions: tmux sessions, worktree isolation, multi-agent feature workflow, and codebase navigation. |
@@ -72,6 +72,8 @@ to re-run any time. It also runs `systemctl --user daemon-reload` if
 `systemctl` is available.
 
 Codex's `config.toml` remains a regular machine-local file because it also stores project trust and generated state. Installation copies the personal defaults only when the file is absent and preserves an existing configuration. The full desktop snapshot lives in `codex/profiles/desktop.toml`; review local paths and trust entries before restoring it on another machine. To refresh that snapshot from the desktop, copy `~/.codex/config.toml` to `codex/profiles/desktop.toml`.
+
+`features.default_mode_request_user_input` enables Codex's under-development structured question tool outside Plan mode. If the Codex app-server daemon is already running, this setting takes effect after `codex app-server daemon restart`, which can interrupt an active turn.
 
 The Codex launcher requires Node and npm, normally provided by nvm, and an installed `@openai/codex` package in the active Node environment. Installation links configuration and scripts; it does not install or update agent binaries.
 

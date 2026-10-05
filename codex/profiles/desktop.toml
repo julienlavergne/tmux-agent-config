@@ -27,6 +27,9 @@ source = "/home/julien/.codex/.tmp/bundled-marketplaces/openai-bundled"
 [plugins."visualize@openai-bundled"]
 enabled = true
 
+[features]
+default_mode_request_user_input = true
+
 [hooks.state."/home/julien/workspace/sunder-forge/sunder-forge/.codex/hooks.json:pre_tool_use:0:0"]
 trusted_hash = "sha256:14a8c7e58ebcc98d77e9948f8ed8fd4521a72408c0215d127c7b9df33efe9648"
 

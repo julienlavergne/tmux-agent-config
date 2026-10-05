@@ -10,3 +10,6 @@ status_line_use_colors = true
 
 [plugins."visualize@openai-bundled"]
 enabled = true
+
+[features]
+default_mode_request_user_input = true
