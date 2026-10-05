@@ -42,9 +42,10 @@ Answer the question that was asked, at the length needed to answer it. Default t
 
 ## Asking Questions
 
-- Use the available structured question tool instead of burying questions in prose. If no suitable tool is available, ask a concise, clearly separated question in text.
-- For decisions with concrete alternatives, give mutually exclusive options that explain what happens if chosen. Put the recommended option first and mark it `(Recommended)` where the tool supports that label. Do not invent options for a question that genuinely needs a free-text answer.
-- Batch related questions into one call. If there is an obvious default, take it and state the assumption when relevant; do not manufacture a question to be safe.
+- When you need an answer from me, use the current agent's structured question tool whenever it is available: Codex's `request_user_input` tool or Claude Code's `AskUserQuestion` tool. Do not ask the question in ordinary prose or as a command-approval request when the structured question tool is available. A permission or command-approval dialog is not a substitute for asking me a question.
+- Use the structured question tool for both choices and free-text input when it supports them. For decisions with concrete alternatives, give mutually exclusive options that explain what happens if chosen. Put the recommended option first and mark it `(Recommended)` where the tool supports that label. Do not invent options for a question that genuinely needs a free-text answer.
+- Ask only when my answer could materially change the result or is needed to proceed. If there is a sound default, state the assumption and continue instead of asking. Batch related questions into one tool call, with no more than three short questions per call when the tool has that limit.
+- If the current agent or client does not expose a structured question tool, say so briefly and ask a concise, clearly separated question in text only when an answer is necessary. Never imply that a prose question or approval popup was delivered through the structured question UI.
 - Explain first, ask second. Present the context, proposal, or tradeoff before asking. Keep the question and options short. Give me time to review substantial proposed content before requesting a decision, but do not force an extra turn for a simple clarification.
 
 ## Content Style
