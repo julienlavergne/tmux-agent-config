@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=simple
 EnvironmentFile=%h/.config/ccpocket/bridge.env
-ExecStart=%h/.local/bin/start-ccpocket-bridge
+ExecStart=/bin/bash %h/.local/bin/start-ccpocket-bridge
 Restart=on-failure
 RestartSec=5
 UMask=0077

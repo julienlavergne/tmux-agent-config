@@ -154,6 +154,8 @@ The home-LAN endpoint `ws://192.168.77.2:8765` also remains available while on t
 
 Use `systemctl --user restart ccpocket-bridge` after configuration or package updates, and `systemctl --user status ccpocket-bridge` or `journalctl --user -u ccpocket-bridge` to inspect it. The bridge preserves the existing CLI services; it manages its own sessions. `update-ai-clis` updates the installed Bridge package without restarting active sessions.
 
+For CC Pocket's SSH start/stop controls on the desktop, use host `100.121.101.37`, port `22`, username `julien`, and private-key authentication. The dedicated phone key is `~/.ssh/ccpocket-phone.pem`, in RSA PEM format with no passphrase; its public key is authorized on the desktop. Import that private file into the phone's SSH credentials. Private keys and `authorized_keys` remain outside this repository. The service's explicit `/bin/bash` launcher supports CC Pocket's SSH startup preflight.
+
 ### Codex conversation persistence
 
 Codex services use `ai-sessions/ai-session-codex`, located beside the watcher
