@@ -131,7 +131,7 @@ npm install -g @ccpocket/bridge@1.88.0
 ./install.sh
 ```
 
-Create the private local configuration from `ccpocket/bridge.env.example`, use your machine's Meshnet or LAN address and workspace directory, and generate a pairing key:
+Create the private local configuration from `ccpocket/bridge.env.example`, use your machine's Meshnet or LAN address and allowed home directory, and generate a pairing key:
 
 ```bash
 install -d -m 700 ~/.config/ccpocket
@@ -140,6 +140,8 @@ node -e 'console.log(require("node:crypto").randomBytes(32).toString("base64url"
 ```
 
 Set `BRIDGE_API_KEY` to that generated value. Keep the file local; it is not committed. Codex uses the machine's existing login. Claude subscription authentication is disabled unless you explicitly set `BRIDGE_ALLOW_CLAUDE_OAUTH=1`; see the [upstream Bridge documentation](https://github.com/K9i-0/ccpocket/blob/main/packages/bridge/README.md).
+
+The desktop uses `BRIDGE_ALLOWED_DIRS=/home/julien`, allowing sessions in the home directory and all its descendants, including `~/workspace`. This scope also includes hidden configuration and credential directories; access requires the bridge pairing key.
 
 Start the service and display the pairing QR:
 
