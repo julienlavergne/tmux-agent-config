@@ -3,7 +3,7 @@
 #  tmux-agent-config installer
 # ═══════════════════════════════════════════════════════════════════════════════
 #
-#  Symlinks the generic tmux / Claude Code / AI-session-service config in this
+#  Symlinks the generic tmux / agent / AI-session-service config in this
 #  repo into place. Any existing real file at a target path is backed up
 #  (suffixed .bak-<timestamp>) before being replaced with a symlink, so this
 #  is safe to re-run.
@@ -33,6 +33,8 @@ LINKS=(
     "tmux/tmux-picker|${HOME}/.local/bin/tmux-picker"
     "claude/settings.json|${HOME}/.claude/settings.json"
     "claude/CLAUDE.md|${HOME}/.claude/CLAUDE.md"
+    "shared/AGENTS.md|${HOME}/.codex/AGENTS.md"
+    "shared/AGENTS.md|${HOME}/.claude/rules/preferences.md"
     "claude/rules/common.md|${HOME}/.claude/rules/common.md"
     "claude/rules/python.md|${HOME}/.claude/rules/python.md"
     "claude/statusline/statusline.sh|${HOME}/.claude/claude-cli-status/statusline.sh"

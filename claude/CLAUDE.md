@@ -1,13 +1,6 @@
-# User Environment
+# Claude Code Instructions
 
-## System
-- WSL2 Ubuntu on a Windows 11 desktop, always-on, located at home.
-- Remote VSCode is commonly attached to workspaces from a laptop.
-
-## Networking & Access
-- This machine has SSH access to the user's laptop; the laptop also has SSH access back here.
-- Full internet access is available. Allowed to read online docs, download from official distribution channels, or install from GitHub **with user approval**.
-- Docker containers can be run and exposed externally for remote access from the laptop.
+Personal preferences, including mentoring, environment, tooling, answers, questions, content style, and feature quality, are loaded from `~/.claude/rules/preferences.md`.
 
 ## Session Management
 Claude itself runs inside a tmux session — no need to wrap individual commands, tools, or subagents in tmux. If the user asks to spawn a new Claude session, launch it as a separate process in its own tmux window or session.
@@ -25,30 +18,7 @@ Always start sessions with both `--name <name>` and `--remote-control <name>` so
 ## Worktrees
 Use `isolation: "worktree"` when spawning Agent tool calls for parallel or independent tasks.
 
-## Languages & Stack
-Primary languages and runtimes in use: Rust, Python, C++, Flutter, Docker.
-
-## Project Layout
-Projects live in `~/workspace/<project-name>/`. Each directory is an independent git repository hosted on github.com. Repositories contain only source code — no vendored dependencies, compiled artifacts, or runtime tools. Dependencies and environments are managed externally (tox/uv for Python, Cargo for Rust, etc.) and are never committed.
-
-## Tooling Conventions
-- **Python**: use `tox` + `uv` for dependency management and virtual environments. Do not use pip/venv directly.
-- **Task runner**: use `just` to define and run project commands. Check the `justfile` before writing ad-hoc shell invocations.
-- **Git & GitHub**: use `git` and the `gh` CLI. Repositories are hosted on github.com.
-
-## Content Style
-
-Write everything — code, comments, docs, READMEs, wiki/lore entries, config files — as if it always existed in its current, final form. The content is the target state, not a record of how it got there.
-
-- **No provenance**: don't mention where something was copied/extracted/ported from, what tool or repo it replaced, or the session/task that produced it.
-- **No history**: don't describe what something used to be, decisions that were reconsidered, or a changelog of reasoning embedded in the artifact itself.
-- **No meta-commentary**: code comments explain a non-obvious *why* for today's reader — never "added for the X fix", "replaces the old Y", "handles the Z flow from task N".
-- Applies everywhere content is generated for its own sake: source code, comments, README/doc prose, wiki and lore text, config files.
-- Does **not** apply to things that are inherently historical records: commit messages, PR descriptions, changelogs, and design docs explicitly requested — those are supposed to carry rationale and context.
-
-## Feature Development Philosophy
-
-When asked to implement a feature, unless explicitly stated otherwise, always means a well-designed, tested, and fully integrated result — never a workaround, quick fix, or dirty solution. Quality takes priority over speed. The end result must look as if the feature was there from the beginning.
+## Feature Development Workflow
 
 ### Multi-Agent Workflow
 
@@ -84,10 +54,6 @@ Feature requests follow this agent pipeline, looping until all agents are satisf
    - Invokes the `/code-review` skill on the final diff.
    - Surfaces findings (security issues, secret leaks, anti-patterns, outdated practices) to the relevant agent and triggers another loop if needed.
    - If the loop count reaches 2, surfaces remaining findings to the user instead of looping again.
-
-## Permissions
-- Docker: available on the current user, no sudo needed.
-- `sudo`: full rights are available but **require explicit user approval before each use**.
 
 ## Codebase Navigation
 

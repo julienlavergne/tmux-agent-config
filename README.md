@@ -1,6 +1,6 @@
 # tmux-agent-config
 
-Generic tmux + Claude Code + background AI-session-service config, meant to be
+Generic tmux + Codex / Claude Code + background AI-session-service config, meant to be
 symlinked into place rather than copied — edit the file in the repo, the
 live config updates immediately (and is already tracked by git).
 
@@ -12,7 +12,8 @@ live config updates immediately (and is already tracked by git).
 | `tmux/tmux.conf` | `~/.tmux.conf` | Mouse support, clipboard integration, vi copy-mode, scrollback, window titles. |
 | `tmux/tmux-picker` | `~/.local/bin/tmux-picker` | Login-shell picker: attach/create/delete tmux sessions interactively on login. Uses `fzf` for fuzzy search when it's installed, falls back to a plain numbered menu (no dependencies beyond bash + tmux) when it isn't. |
 | `claude/settings.json` | `~/.claude/settings.json` | Claude Code permission allowlist, statusline wiring, theme/notification prefs. |
-| `claude/CLAUDE.md` | `~/.claude/CLAUDE.md` | Global Claude Code instructions: environment, session-naming convention, project layout, tooling conventions, content style, multi-agent feature workflow. |
+| `shared/AGENTS.md` | `~/.codex/AGENTS.md`, `~/.claude/rules/preferences.md` | Shared personal instructions: candid mentoring, environment, tooling, concise answers, questions, content style, and feature quality. |
+| `claude/CLAUDE.md` | `~/.claude/CLAUDE.md` | Claude-specific instructions: tmux sessions, worktree isolation, multi-agent feature workflow, and codebase navigation. |
 | `claude/rules/common.md` | `~/.claude/rules/common.md` | Engineering rules (code quality, security, testing, git, review) auto-loaded by Claude Code. |
 | `claude/rules/python.md` | `~/.claude/rules/python.md` | Python-specific conventions, auto-loaded by Claude Code. |
 | `claude/statusline/statusline.sh` | `~/.claude/claude-cli-status/statusline.sh` | Custom statusline: project/branch, model, context usage bar, token counts, cost, rate limits. |
@@ -21,6 +22,8 @@ live config updates immediately (and is already tracked by git).
 | `ai-sessions/env.example` | *(not symlinked — a template)* | Per-session `CWD`/`AGENT` env file format consumed by the systemd unit. |
 
 ## Install (this machine or a new one)
+
+Edit `shared/AGENTS.md` for preferences that apply to both Codex and Claude Code. Both global paths link to that file; keep Claude-specific tools and workflows in `claude/CLAUDE.md`. Claude's engineering and language rules remain in `claude/rules/`. Start a new agent session after changing instructions so it loads the current content.
 
 ```bash
 git clone git@github.com:julienlavergne/tmux-agent-config.git ~/workspace/tmux-agent-config
