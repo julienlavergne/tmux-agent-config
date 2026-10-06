@@ -13,6 +13,7 @@ services:
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./routes:/etc/caddy/routes:ro
+      - ${HOME}/.config/caddy/certs:/etc/caddy/certs:ro
       - caddy_data:/data
       - caddy_config:/config
 

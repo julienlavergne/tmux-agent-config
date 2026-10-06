@@ -3,6 +3,7 @@
 }
 
 julienlavergne.asuscomm.com {
+	tls /etc/caddy/certs/cert.pem /etc/caddy/certs/key.pem
 	import /etc/caddy/routes/web/*.caddy
 	handle {
 		reverse_proxy host.docker.internal:8000
@@ -10,5 +11,6 @@ julienlavergne.asuscomm.com {
 }
 
 https://julienlavergne.asuscomm.com:8765 {
+	tls /etc/caddy/certs/cert.pem /etc/caddy/certs/key.pem
 	reverse_proxy host.docker.internal:8765
 }
