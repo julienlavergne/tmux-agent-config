@@ -44,6 +44,10 @@ start_policy() {
             -i "$lan_interface" -d "$lan_address" -p tcp --dport "$port" \
             -j CONNMARK --set-xmark "${mark}/${mark_mask}"
     done
+    iptables -w -t mangle -A "$chain" \
+        -m conntrack --ctdir REPLY \
+        -m connmark --mark "${mark}/${mark_mask}" \
+        -j MARK --set-xmark "${mark}/${mark_mask}"
     iptables -w -t mangle -A "$chain" -j RETURN
     iptables -w -t mangle -C PREROUTING -j "$chain" 2>/dev/null || \
         iptables -w -t mangle -I PREROUTING 1 -j "$chain"
