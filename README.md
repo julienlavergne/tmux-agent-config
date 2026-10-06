@@ -35,6 +35,7 @@ live config updates immediately (and is already tracked by git).
 | `ccpocket/start-bridge` | `~/.local/bin/start-ccpocket-bridge` | Launches the installed Bridge in the active Node environment without printing pairing credentials in service logs. |
 | `ccpocket/pair` | `~/.local/bin/ccpocket-pair` | Displays a local pairing QR and saves it to `~/.ccpocket/pairing.png`. |
 | `ccpocket/bridge.env.example` | *(local configuration template)* | Bridge address, workspace scope and Claude authentication opt-in. The real key stays in `~/.config/ccpocket/bridge.env`. |
+| `ccpocket/Caddyfile`, `ccpocket/compose.yaml` | *(public TLS endpoint)* | Terminates HTTPS/WSS for the public CC Pocket endpoint and proxies to the local Bridge. |
 | `ai-sessions/env.example` | *(not symlinked — a template)* | Per-session `CWD`/`AGENT` env file format consumed by the systemd unit. |
 
 ## Install (this machine or a new one)
@@ -153,7 +154,7 @@ npm install -g @ccpocket/bridge@1.88.0
 ./install.sh
 ```
 
-Create the private local configuration from `ccpocket/bridge.env.example`, use your machine's Meshnet or LAN address and allowed home directory, and generate a pairing key:
+Create the private local configuration from `ccpocket/bridge.env.example`, use the public WSS endpoint or the trusted home-LAN endpoint, and generate a pairing key:
 
 ```bash
 install -d -m 700 ~/.config/ccpocket
@@ -172,9 +173,9 @@ systemctl --user enable --now ccpocket-bridge.service
 ccpocket-pair
 ```
 
-The desktop's advertised endpoint is `ws://100.121.101.37:8765`, its NordVPN Meshnet address (`julien-desktop-meshnet`). Enable Meshnet on the phone under the same Nord account, then enter that endpoint and the bridge key in CC Pocket or scan the pairing QR. Linked devices need permission to access the desktop remotely. Meshnet provides the private route when away from home; see the [Meshnet remote-access guide](https://meshnet.nordvpn.com/how-to/joint-projects/nginx-web-server-access).
+For internet access, use `wss://julienlavergne.asuscomm.com`. Caddy obtains and renews the TLS certificate and forwards WebSocket traffic to the local Bridge. Forward TCP 80 and 443 through the router to the WSL LAN address `192.168.77.2`; after WSS is verified, remove the public TCP 8765 forward. Keep `BRIDGE_API_KEY` configured.
 
-The home-LAN endpoint `ws://192.168.77.2:8765` also remains available while on that network. The QR includes the authentication key and uses `BRIDGE_PUBLIC_WS_URL` from the local configuration. Regenerate it with `ccpocket-pair` after changing the key or address.
+At home, use mDNS or `ws://192.168.77.2:8765` for a direct LAN connection. That local URL is unencrypted; use it only on a trusted network. The QR uses `BRIDGE_PUBLIC_WS_URL` from the private configuration. Regenerate it with `ccpocket-pair` after changing the key or public address.
 
 Use `systemctl --user restart ccpocket-bridge` after configuration or package updates, and `systemctl --user status ccpocket-bridge` or `journalctl --user -u ccpocket-bridge` to inspect it. `update-ai-clis` updates the installed Bridge package without restarting active sessions.
 
