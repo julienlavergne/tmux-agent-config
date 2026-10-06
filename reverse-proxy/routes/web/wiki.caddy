@@ -1,0 +1,6 @@
+@wiki_without_slash path /wiki
+redir @wiki_without_slash /wiki/ 308
+
+handle_path /wiki/* {
+	reverse_proxy host.docker.internal:8000
+}

@@ -35,7 +35,7 @@ live config updates immediately (and is already tracked by git).
 | `ccpocket/start-bridge` | `~/.local/bin/start-ccpocket-bridge` | Launches the installed Bridge in the active Node environment without printing pairing credentials in service logs. |
 | `ccpocket/pair` | `~/.local/bin/ccpocket-pair` | Displays a local pairing QR and saves it to `~/.ccpocket/pairing.png`. |
 | `ccpocket/bridge.env.example` | *(local configuration template)* | Bridge address, workspace scope and Claude authentication opt-in. The real key stays in `~/.config/ccpocket/bridge.env`. |
-| `ccpocket/Caddyfile`, `ccpocket/compose.yaml` | *(public TLS endpoint)* | Terminates HTTPS/WSS for the public CC Pocket endpoint and proxies to the local Bridge. |
+| `reverse-proxy/` | *(global public reverse proxy)* | Runs Caddy for CC Pocket, the Sunder Forge wiki and future services, with TLS state persisted in Docker volumes. |
 | `ai-sessions/env.example` | *(not symlinked — a template)* | Per-session `CWD`/`AGENT` env file format consumed by the systemd unit. |
 
 ## Install (this machine or a new one)
@@ -173,13 +173,15 @@ systemctl --user enable --now ccpocket-bridge.service
 ccpocket-pair
 ```
 
-For internet access, use `wss://julienlavergne.asuscomm.com`. Caddy obtains and renews the TLS certificate and forwards WebSocket traffic to the local Bridge. Forward TCP 80 and 443 through the router to the WSL LAN address `192.168.77.2`; after WSS is verified, remove the public TCP 8765 forward. Keep `BRIDGE_API_KEY` configured.
+For internet access, the global Caddy instance serves the wiki at `https://julienlavergne.asuscomm.com` and CC Pocket at `wss://julienlavergne.asuscomm.com:8765`. Caddy obtains and renews the TLS certificate through public port 443. The router forwards public TCP 80 to desktop port 18080, public TCP 443 to desktop port 18443, and public TCP 8765 to desktop port 18765. These high local ports keep local ports 80 and 443 unused, while CC Pocket retains its dedicated public port. Keep `BRIDGE_API_KEY` configured.
+
+Start the shared proxy from the repository root with `docker compose -f reverse-proxy/compose.yaml up -d`. The public 8765 router rule must target 18765 rather than the Bridge's local 8765 listener. WSL mirrored networking exposes these Docker-published ports directly, so no Windows portproxy rule is required. Caddy proxies to the wiki on local port 8000 and to CC Pocket Bridge on local port 8765. To expose another web service, add a route snippet under `reverse-proxy/routes/web/`; the root domain block imports those snippets, and unmatched paths continue to the wiki.
 
 At home, use mDNS or `ws://192.168.77.2:8765` for a direct LAN connection. That local URL is unencrypted; use it only on a trusted network. The QR uses `BRIDGE_PUBLIC_WS_URL` from the private configuration. Regenerate it with `ccpocket-pair` after changing the key or public address.
 
 Use `systemctl --user restart ccpocket-bridge` after configuration or package updates, and `systemctl --user status ccpocket-bridge` or `journalctl --user -u ccpocket-bridge` to inspect it. `update-ai-clis` updates the installed Bridge package without restarting active sessions.
 
-On this desktop, CC Pocket connects to the existing Codex app/IDE daemon using `BRIDGE_CODEX_APP_SERVER_MODE=external` and a `ws+unix://<socket-path>:/` URL in the private local environment file. Codex's Unix endpoint accepts WebSocket connections; CC Pocket's WebSocket client supports this local transport. Sharing the same daemon lets CC Pocket resume threads owned by that daemon without creating a competing writer. The launcher ensures the daemon is running before starting the Bridge. Locate the active control socket with `ss -lxnp`; it is under `/tmp/codex-daemon-<uid>/`. This connection remains local; the phone continues to use the authenticated Meshnet bridge endpoint.
+On this desktop, CC Pocket connects to the existing Codex app/IDE daemon using `BRIDGE_CODEX_APP_SERVER_MODE=external` and a `ws+unix://<socket-path>:/` URL in the private local environment file. Codex's Unix endpoint accepts WebSocket connections; CC Pocket's WebSocket client supports this local transport. Sharing the same daemon lets CC Pocket resume threads owned by that daemon without creating a competing writer. The launcher ensures the daemon is running before starting the Bridge. Locate the active control socket with `ss -lxnp`; it is under `/tmp/codex-daemon-<uid>/`. This connection remains local; the phone uses the authenticated WSS endpoint through Caddy.
 
 This integration has been verified with Codex 0.160.0 and Bridge 1.88.0. Threads owned by an independent Codex process still require a handoff. For a terminal client joining the desktop daemon, use `codex resume <thread-id> --remote unix://`.
 

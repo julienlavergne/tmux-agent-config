@@ -1,23 +1,15 @@
-# Public CC Pocket access
+# CC Pocket Bridge
 
-Caddy terminates HTTPS for the public CC Pocket endpoint and forwards WebSocket traffic to the local Bridge. The Bridge keeps its API-key authentication and existing Codex app-server connection.
+The authenticated Bridge runs as a user service. The global Caddy instance in `../reverse-proxy/` provides its public WSS endpoint on port `8765`, alongside HTTPS access to the Sunder Forge wiki and other routed services.
 
-## Router setup
+Set `BRIDGE_PUBLIC_WS_URL=wss://julienlavergne.asuscomm.com:8765` in the private `~/.config/ccpocket/bridge.env`. Keep `BRIDGE_API_KEY` configured. The local Bridge continues listening on port `8765`; the router sends public port `8765` to Caddy's host port `18765` instead of directly to the Bridge.
 
-Forward TCP ports `80` and `443` to the WSL LAN address `192.168.77.2`. Remove the public TCP `8765` forward after the HTTPS endpoint has been verified. Keep `8765` available on trusted local interfaces for direct home-Wi-Fi access if desired.
+The router forwards public TCP `80` to host port `18080`, public TCP `443` to host port `18443`, and public TCP `8765` to host port `18765`. Caddy runs in WSL's Docker bridge network and uses only those high host ports, leaving host ports `80` and `443` unused. Port `443` must be reachable from the internet for Caddy to obtain a publicly trusted certificate. Port `80` supports HTTP redirects and the alternate ACME challenge.
 
-WSL uses mirrored networking and has its own LAN address, so a Windows `netsh portproxy` rule is not required for this setup.
-
-## Start and verify
-
-From this directory, start Caddy with:
+Start Caddy from the repository root:
 
 ```sh
-docker compose up -d
+docker compose -f reverse-proxy/compose.yaml up -d
 ```
 
-Use `wss://julienlavergne.asuscomm.com` as the CC Pocket Bridge URL. Caddy obtains and renews the TLS certificate automatically. Persisted certificate state is kept in Docker volumes.
-
-For direct home-Wi-Fi access, CC Pocket can use mDNS or `ws://192.168.77.2:8765`. Use the HTTPS domain for internet access.
-
-Keep `BRIDGE_API_KEY` configured in `~/.config/ccpocket/bridge.env`. The public router must not forward TCP `8765` directly to the Bridge.
+At home, use mDNS or `ws://192.168.77.2:8765` on a trusted network. For remote access, use `wss://julienlavergne.asuscomm.com:8765`. Regenerate the pairing QR with `ccpocket-pair` after changing the public URL or pairing key.
