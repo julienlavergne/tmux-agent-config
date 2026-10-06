@@ -6,6 +6,8 @@ Set `BRIDGE_PUBLIC_WS_URL=wss://julienlavergne.asuscomm.com:8765` in the private
 
 The router forwards public TCP `80` to host port `18080`, public TCP `443` to host port `18443`, and public TCP `8765` to host port `18765`. Caddy runs in WSL's Docker bridge network and uses only those high host ports, leaving host ports `80` and `443` unused. Caddy uses the ASUS router's exported certificate from `~/.config/caddy/certs/cert.pem` and `key.pem`; after the router renews its certificate, replace these files and restart Caddy.
 
+The WSL egress policy in `../reverse-proxy/` routes replies for those inbound Caddy ports through the normal LAN gateway. Other WSL traffic keeps its VPN route.
+
 Start Caddy from the repository root:
 
 ```sh

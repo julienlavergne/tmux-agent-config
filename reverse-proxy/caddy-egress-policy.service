@@ -1,0 +1,14 @@
+[Unit]
+Description=Route Caddy replies over the normal network interface
+Wants=network-online.target
+After=network-online.target
+Before=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/libexec/caddy-egress-policy start
+ExecStop=/usr/local/libexec/caddy-egress-policy stop
+
+[Install]
+WantedBy=multi-user.target
