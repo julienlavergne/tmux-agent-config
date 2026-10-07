@@ -4,6 +4,7 @@
 NAME="$1"
 CWD="$2"
 AGENT="$3"
+NETWORK_NAMESPACE="${NETWORK_NAMESPACE:-host}"
 
 CLAUDE="${HOME}/.local/bin/claude"
 COPILOT="${HOME}/.local/bin/copilot"
@@ -11,6 +12,15 @@ CODEX="${HOME}/.local/bin/codex"
 DB="${HOME}/.copilot/session-store.db"
 CODEX_SESSIONS_DIR="${HOME}/.codex/sessions"
 PROJECT_DIR="${HOME}/.claude/projects/$(echo "${CWD}" | sed 's|/|-|g')"
+
+case "${NETWORK_NAMESPACE}" in
+    host|agent-vpn) ;;
+    *) echo "Unsupported NETWORK_NAMESPACE: ${NETWORK_NAMESPACE}" >&2; exit 2 ;;
+esac
+if [[ "${NETWORK_NAMESPACE}" == 'agent-vpn' && "${AGENT}" == 'copilot' ]]; then
+    echo 'The agent-vpn namespace currently supports Claude and Codex sessions only.' >&2
+    exit 2
+fi
 
 make_claude_cmd() {
     # Resolve to the exact session ID of the most recent transcript with this
@@ -51,11 +61,17 @@ make_codex_cmd() {
 }
 
 make_cmd() {
+    local command
     case "${AGENT}" in
-        claude)  make_claude_cmd ;;
-        copilot) make_copilot_cmd ;;
-        codex)   make_codex_cmd ;;
+        claude)  command="$(make_claude_cmd)" ;;
+        copilot) command="$(make_copilot_cmd)" ;;
+        codex)   command="$(make_codex_cmd)" ;;
     esac
+    if [[ "${NETWORK_NAMESPACE}" == 'agent-vpn' ]]; then
+        printf '%q -- %s' "${HOME}/.local/bin/agent-vpn-run" "${command}"
+    else
+        printf '%s' "${command}"
+    fi
 }
 
 # "=NAME" forces an exact session-name match. Without it, tmux target lookup

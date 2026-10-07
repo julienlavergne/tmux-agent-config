@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly expected_user='julien'
+readonly namespace='agent-vpn'
+
+[[ ${EUID} -eq 0 ]] || { printf '%s\n' 'This helper must be run through its sudo rule.' >&2; exit 1; }
+[[ ${SUDO_UID:-} == '1000' ]] || { printf '%s\n' 'This helper is restricted to Julien’s account.' >&2; exit 1; }
+[[ "$(getent passwd "$SUDO_UID" | cut -d: -f1)" == "$expected_user" ]] || {
+    printf '%s\n' 'The invoking account does not match the configured agent user.' >&2
+    exit 1
+}
+[[ $# -gt 0 ]] || { printf '%s\n' 'Usage: agent-vpn-run -- command [args...]' >&2; exit 2; }
+
+if [[ "${1:-}" == '--' ]]; then
+    shift
+fi
+[[ $# -gt 0 ]] || { printf '%s\n' 'No command was provided.' >&2; exit 2; }
+ip netns list | awk '{print $1}' | grep -Fxq "$namespace" || {
+    printf '%s\n' 'The agent-vpn namespace is not active; refusing to launch outside the tunnel.' >&2
+    exit 1
+}
+ip -n "$namespace" link show dev wg-agent 2>/dev/null | grep -q '<[^>]*UP' || {
+    printf '%s\n' 'The WireGuard interface is down; refusing to launch outside the tunnel.' >&2
+    exit 1
+}
+ip -n "$namespace" -4 route show default | grep -q 'dev wg-agent' || {
+    printf '%s\n' 'The sandbox has no WireGuard default route; refusing to launch.' >&2
+    exit 1
+}
+
+readonly user_home="$(getent passwd "$SUDO_UID" | cut -d: -f6)"
+readonly user_shell="$(getent passwd "$SUDO_UID" | cut -d: -f7)"
+readonly node_bin="$(find "$user_home/.nvm/versions/node" -mindepth 2 -maxdepth 2 -type d -name bin -print 2>/dev/null | sort -V | tail -n 1)"
+readonly user_path="${user_home}/.local/bin${node_bin:+:${node_bin}}:/usr/local/bin:/usr/bin:/bin"
+readonly user_uid="$SUDO_UID"
+readonly user_gid="$(id -g "$expected_user")"
+
+exec /usr/sbin/ip netns exec "$namespace" \
+    /usr/bin/setpriv \
+        --reuid="$user_uid" \
+        --regid="$user_gid" \
+        --init-groups \
+        --no-new-privs \
+        /usr/bin/env -i \
+        "HOME=$user_home" \
+        "USER=$expected_user" \
+        "LOGNAME=$expected_user" \
+        "SHELL=$user_shell" \
+        "PATH=$user_path" \
+        "TERM=${TERM:-xterm-256color}" \
+        "LANG=${LANG:-C.UTF-8}" \
+        "XDG_RUNTIME_DIR=/run/user/$user_uid" \
+        "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$user_uid/bus" \
+        "$@"

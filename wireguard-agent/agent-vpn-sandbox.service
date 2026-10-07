@@ -1,0 +1,13 @@
+[Unit]
+Description=Freebox WireGuard network namespace for AI CLI sessions
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/libexec/agent-vpn-netns up
+ExecStop=/usr/local/libexec/agent-vpn-netns down
+
+[Install]
+WantedBy=multi-user.target
