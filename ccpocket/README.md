@@ -14,4 +14,4 @@ Start Caddy from the repository root:
 docker compose -f reverse-proxy/compose.yaml up -d
 ```
 
-At home, use mDNS or `ws://192.168.77.2:8765` on a trusted network. For remote access, use `wss://julienlavergne.asuscomm.com:8765`. Regenerate the pairing QR with `ccpocket-pair` after changing the public URL or pairing key.
+For direct Meshnet access, use `ws://julien-desktop-meshnet:8765` with the Bridge API key. This reaches the Bridge directly and bypasses Caddy; the firewall allows TCP 8765 only from Meshnet addresses in `100.64.0.0/10`. For public access, use `wss://julienlavergne.asuscomm.com:8765` through Caddy. Regenerate the pairing QR with `ccpocket-pair` after changing the public URL or pairing key.
