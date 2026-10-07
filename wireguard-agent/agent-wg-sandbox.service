@@ -6,8 +6,8 @@ After=network-online.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/local/libexec/agent-vpn-netns up
-ExecStop=/usr/local/libexec/agent-vpn-netns down
+ExecStart=/usr/local/libexec/agent-wg-netns up
+ExecStop=/usr/local/libexec/agent-wg-netns down
 
 [Install]
 WantedBy=multi-user.target

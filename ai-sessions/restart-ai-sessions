@@ -42,8 +42,13 @@ systemctl --user restart "${units[@]}"
 # Restart the codex remote-control daemon if any codex sessions were restarted,
 # so it reconnects to the fresh sessions.
 if printf '%s\n' "${units[@]}" | grep -q 'codex'; then
-    systemctl --user restart codex-remote-control.service 2>/dev/null \
-        && echo "Restarted codex-remote-control.service"
+    if [[ -e /run/netns/agent-wg ]]; then
+        systemctl --user restart codex-remote-control-agent-wg.service 2>/dev/null \
+            && echo "Restarted codex-remote-control-agent-wg.service"
+    else
+        systemctl --user restart codex-remote-control.service 2>/dev/null \
+            && echo "Restarted codex-remote-control.service"
+    fi
 fi
 
 echo

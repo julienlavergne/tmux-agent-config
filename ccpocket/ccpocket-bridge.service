@@ -1,13 +1,17 @@
 [Unit]
 Description=CC Pocket Bridge Server
-After=network.target
+ConditionPathExists=/run/netns/agent-wg
+After=network.target codex-remote-control-agent-wg.service
+Conflicts=ccpocket-bridge-host.service
 
 [Service]
 Type=simple
 EnvironmentFile=%h/.config/ccpocket/bridge.env
-ExecStart=/bin/bash %h/.local/bin/start-ccpocket-bridge
+EnvironmentFile=/etc/agent-wg/network.env
+Environment=BRIDGE_LAUNCH_SOURCE=agent-wg-service
+ExecStart=%h/.local/bin/agent-wg-run --inherit-env -- /bin/bash %h/.local/bin/start-ccpocket-bridge
 Restart=on-failure
-RestartSec=5
+RestartSec=30
 UMask=0077
 
 [Install]

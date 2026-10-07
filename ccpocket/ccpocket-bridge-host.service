@@ -1,0 +1,16 @@
+[Unit]
+Description=CC Pocket Bridge Server on the host network
+Conflicts=ccpocket-bridge.service
+After=network.target codex-remote-control.service
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/ccpocket/bridge.env
+Environment=BRIDGE_LAUNCH_SOURCE=host-service
+ExecStart=/bin/bash %h/.local/bin/start-ccpocket-bridge
+Restart=on-failure
+RestartSec=5
+UMask=0077
+
+[Install]
+WantedBy=default.target

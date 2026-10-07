@@ -1,11 +1,27 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly namespace='agent-vpn'
+readonly namespace='agent-wg'
 readonly interface='wg-agent'
 readonly config='/home/julien/.config/wireguard/freebox-agent.conf'
-readonly state_file='/run/agent-vpn-netns.state'
+readonly state_file='/run/agent-wg-netns.state'
 readonly underlay_interface='eth3'
+readonly network_config='/etc/agent-wg/network.env'
+
+[[ -r "$network_config" ]] || {
+    printf 'Missing namespace network configuration: %s\n' "$network_config" >&2
+    exit 1
+}
+# shellcheck source=/etc/agent-wg/network.env
+source "$network_config"
+
+readonly caddy_bridge="${AGENT_WG_CADDY_BRIDGE:?}"
+readonly host_veth="${AGENT_WG_HOST_VETH:?}"
+readonly namespace_veth="${AGENT_WG_NAMESPACE_VETH:?}"
+readonly host_veth_address="${AGENT_WG_HOST_VETH_IP:?}"
+readonly namespace_veth_address="${BRIDGE_HOST:?}"
+readonly namespace_veth_cidr="${BRIDGE_HOST}/${AGENT_WG_VETH_PREFIX:?}"
+readonly bridge_port="${BRIDGE_PORT:?}"
 
 fail() {
     printf '%s\n' "$*" >&2
@@ -13,7 +29,7 @@ fail() {
 }
 
 require_root() {
-    [[ ${EUID} -eq 0 ]] || fail 'Run this through agent-vpn-sandbox.service or as root.'
+    [[ ${EUID} -eq 0 ]] || fail 'Run this through agent-wg-sandbox.service or as root.'
 }
 
 config_value() {
@@ -68,6 +84,46 @@ normal_route() {
     [[ -n "$underlay_gateway" && -n "$underlay_address" ]] || fail "Could not determine the normal gateway and address on ${underlay_interface}."
 }
 
+install_bridge_forwarding_rules() {
+    iptables -w -C INPUT -i "$host_veth" -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || \
+        iptables -w -I INPUT 1 -i "$host_veth" -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+    iptables -w -C INPUT -i "$host_veth" -j DROP 2>/dev/null || \
+        iptables -w -I INPUT 2 -i "$host_veth" -j DROP
+
+    iptables -w -C FORWARD -i "$caddy_bridge" -o "$host_veth" \
+        -d "${namespace_veth_address}/32" -p tcp --dport "$bridge_port" \
+        -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT 2>/dev/null || \
+        iptables -w -I FORWARD 1 -i "$caddy_bridge" -o "$host_veth" \
+            -d "${namespace_veth_address}/32" -p tcp --dport "$bridge_port" \
+            -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT
+    iptables -w -C FORWARD -i "$host_veth" -o "$caddy_bridge" \
+        -s "${namespace_veth_address}/32" -p tcp --sport "$bridge_port" \
+        -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || \
+        iptables -w -I FORWARD 1 -i "$host_veth" -o "$caddy_bridge" \
+            -s "${namespace_veth_address}/32" -p tcp --sport "$bridge_port" \
+            -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+    iptables -w -t nat -C POSTROUTING -o "$host_veth" \
+        -d "${namespace_veth_address}/32" -p tcp --dport "$bridge_port" \
+        -j SNAT --to-source "$host_veth_address" 2>/dev/null || \
+        iptables -w -t nat -I POSTROUTING 1 -o "$host_veth" \
+            -d "${namespace_veth_address}/32" -p tcp --dport "$bridge_port" \
+            -j SNAT --to-source "$host_veth_address"
+}
+
+remove_bridge_forwarding_rules() {
+    iptables -w -D INPUT -i "$host_veth" -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || true
+    iptables -w -D INPUT -i "$host_veth" -j DROP 2>/dev/null || true
+    iptables -w -D FORWARD -i "$caddy_bridge" -o "$host_veth" \
+        -d "${namespace_veth_address}/32" -p tcp --dport "$bridge_port" \
+        -m conntrack --ctstate NEW,ESTABLISHED -j ACCEPT 2>/dev/null || true
+    iptables -w -D FORWARD -i "$host_veth" -o "$caddy_bridge" \
+        -s "${namespace_veth_address}/32" -p tcp --sport "$bridge_port" \
+        -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || true
+    iptables -w -t nat -D POSTROUTING -o "$host_veth" \
+        -d "${namespace_veth_address}/32" -p tcp --dport "$bridge_port" \
+        -j SNAT --to-source "$host_veth_address" 2>/dev/null || true
+}
+
 up() {
     require_root
     validate_config
@@ -77,7 +133,10 @@ up() {
         fail "The ${namespace} namespace already exists."
     fi
 
-    local endpoint_route_before route_added=0 namespace_created=0 interface_created=0
+    ip link show dev "$caddy_bridge" >/dev/null 2>&1 || fail "Docker's ${caddy_bridge} interface is unavailable."
+    command -v iptables >/dev/null 2>&1 || fail 'iptables is required for the restricted Caddy forwarding path.'
+
+    local endpoint_route_before route_added=0 namespace_created=0 interface_created=0 veth_created=0
     endpoint_route_before="$(ip -4 route get "$endpoint_ip" 2>/dev/null || true)"
     if [[ "$endpoint_route_before" != *"dev ${underlay_interface}"* ]]; then
         ip -4 route add "${endpoint_ip}/32" \
@@ -86,8 +145,12 @@ up() {
     fi
 
     rollback() {
+        remove_bridge_forwarding_rules
         if [[ "$namespace_created" == 1 ]]; then
             ip netns del "$namespace" 2>/dev/null || true
+        fi
+        if [[ "$veth_created" == 1 ]]; then
+            ip link del "$host_veth" 2>/dev/null || true
         fi
         if [[ "$interface_created" == 1 ]]; then
             ip link del "$interface" 2>/dev/null || true
@@ -104,6 +167,16 @@ up() {
     modprobe wireguard
     ip netns add "$namespace"
     namespace_created=1
+
+    ip link add "$host_veth" type veth peer name "$namespace_veth"
+    veth_created=1
+    ip link set "$namespace_veth" netns "$namespace"
+    ip address add "${host_veth_address}/30" dev "$host_veth"
+    ip link set "$host_veth" up
+    ip -n "$namespace" address add "$namespace_veth_cidr" dev "$namespace_veth"
+    ip -n "$namespace" link set "$namespace_veth" up
+    install_bridge_forwarding_rules
+
     ip link add dev "$interface" type wireguard
     interface_created=1
     wg setconf "$interface" <(wg-quick strip "$config")
@@ -133,11 +206,11 @@ up() {
     printf 'endpoint=%s\ngateway=%s\ninterface=%s\naddress=%s\nroute_added=%s\n' \
         "$endpoint_ip" "$underlay_gateway" "$underlay_interface" "$underlay_address" "$route_added" >"$state_file"
     chmod 0600 "$state_file"
-    trap - ERR
 
     local selected_route
     selected_route="$(ip -n "$namespace" -4 route get 1.1.1.1)"
     [[ "$selected_route" == *"dev ${interface}"* ]] || fail "Sandbox route did not select ${interface}: ${selected_route}"
+    trap - ERR
     printf 'Namespace %s is configured. Agent IPv4 traffic will use WireGuard; the tunnel is now active.\n' "$namespace"
 }
 
@@ -152,7 +225,9 @@ down() {
     processes="$(ip netns pids "$namespace")"
     [[ -z "$processes" ]] || fail "Stop the sandboxed agent processes before stopping the tunnel (PIDs: ${processes//$'\n'/ })."
 
+    remove_bridge_forwarding_rules
     ip netns del "$namespace"
+    ip link del "$host_veth" 2>/dev/null || true
     if [[ -s "$state_file" ]]; then
         local endpoint gateway iface address route_added
         endpoint="$(awk -F= '$1 == "endpoint" {print $2}' "$state_file")"
@@ -172,6 +247,7 @@ status() {
     if ip netns list | awk '{print $1}' | grep -Fxq "$namespace"; then
         ip -n "$namespace" -brief address show
         ip -n "$namespace" -4 route show
+        ip -brief address show dev "$host_veth" 2>/dev/null || true
     else
         printf 'Namespace %s is down.\n' "$namespace"
     fi

@@ -25,19 +25,21 @@ live config updates immediately (and is already tracked by git).
 | `ai-sessions/ai-session@.service` | `~/.config/systemd/user/ai-session@.service` | systemd user template unit that keeps a named tmux session alive running `claude`, `copilot`, or `codex`. |
 | `ai-sessions/ai-session-watch` | `~/.local/bin/ai-session-watch` | Watcher script the unit runs: creates the tmux session if missing, resumes the most recent matching transcript, respawns on crash. |
 | `ai-sessions/ai-session-codex`, `ai-session-copilot` | *(loaded beside the watcher)* | Python helpers that preserve each service's foreground conversation identity. |
-| `ai-sessions/codex-remote-control.service` | `~/.config/systemd/user/codex-remote-control.service` | Starts the Codex remote-control daemon. |
+| `ai-sessions/codex-remote-control.service` | `~/.config/systemd/user/codex-remote-control.service` | Host-network Codex daemon fallback, enabled only when recovering from `agent-wg`. |
 | `ai-sessions/profiles/desktop/*.env` | `~/.config/ai-sessions/*.env` *(with `--sessions desktop`)* | Desktop session definitions; installation does not start or restart sessions. |
 | `ai-sessions/profiles/desktop/enabled-sessions.txt` | *(restoration inventory)* | Names of enabled desktop AI-session services. |
 | `ai-sessions/restart-ai-sessions` | `~/.local/bin/restart-ai-sessions` | Restarts `ai-session@` systemd units on this host — all of them, or specific names passed as arguments. |
 | `ai-sessions/update-ai-clis.sh` | `~/.local/bin/update-ai-clis`, `~/update-ai-clis.sh` | Updates Claude, stable Copilot, Codex and installed CC Pocket Bridge. Optional `--update-daemon` replaces the Codex daemon package. |
 | `ai-sessions/update-ai-clis.service`, `update-ai-clis.timer` | `~/.config/systemd/user/update-ai-clis.{service,timer}` | Daily package updates around 04:00 China time, with journal logs and missed-run catch-up. |
-| `ccpocket/ccpocket-bridge.service` | `~/.config/systemd/user/ccpocket-bridge.service` | Persistent authenticated CC Pocket Bridge service. |
+| `ccpocket/ccpocket-bridge.service` | `~/.config/systemd/user/ccpocket-bridge.service` | Runs the authenticated CC Pocket Bridge inside `agent-wg`. |
+| `ccpocket/ccpocket-bridge-host.service` | `~/.config/systemd/user/ccpocket-bridge-host.service` | Host-network recovery service used by `agent-wg-transition recover`. |
 | `ccpocket/start-bridge` | `~/.local/bin/start-ccpocket-bridge` | Launches the installed Bridge in the active Node environment without printing pairing credentials in service logs. |
 | `ccpocket/pair` | `~/.local/bin/ccpocket-pair` | Displays a local pairing QR and saves it to `~/.ccpocket/pairing.png`. |
 | `ccpocket/bridge.env.example` | *(local configuration template)* | Bridge address, workspace scope and Claude authentication opt-in. The real key stays in `~/.config/ccpocket/bridge.env`. |
 | `reverse-proxy/` | *(global public reverse proxy)* | Runs Caddy for CC Pocket, the Sunder Forge wiki and future services, using the ASUS DDNS TLS certificate stored outside Git. |
-| `reverse-proxy/configure-firewall.ps1` | *(Windows firewall setup)* | Allows Caddy's three high local TCP ports and direct Meshnet access to Bridge port 8765 in Windows and WSL Hyper-V firewalls. |
+| `reverse-proxy/configure-firewall.ps1` | *(Windows firewall setup)* | Allows Caddy's three high local TCP ports and its Meshnet-only listener on port 8765 in Windows and WSL Hyper-V firewalls. |
 | `reverse-proxy/caddy-egress-policy.sh`, `caddy-egress-policy.service`, `install-egress-policy.sh` | *(WSL Caddy routing)* | Routes replies for Caddy's inbound high TCP ports through the normal LAN gateway while leaving other WSL traffic on its existing VPN route. |
+| `wireguard-agent/` | `~/.local/bin/agent-wg-transition` | Freebox WireGuard namespace, restricted Caddy veth path, sandbox launchers, manual cutover and host recovery. |
 | `ai-sessions/env.example` | *(not symlinked — a template)* | Per-session `CWD`/`AGENT` env file format consumed by the systemd unit. |
 
 ## Install (this machine or a new one)
@@ -156,7 +158,7 @@ npm install -g @ccpocket/bridge@1.88.0
 ./install.sh
 ```
 
-Create the private local configuration from `ccpocket/bridge.env.example`, use the public WSS endpoint or the trusted home-LAN endpoint, and generate a pairing key:
+Create the private local configuration from `ccpocket/bridge.env.example`, set the public WSS endpoint, and generate a pairing key:
 
 ```bash
 install -d -m 700 ~/.config/ccpocket
@@ -168,22 +170,24 @@ Set `BRIDGE_API_KEY` to that generated value. Keep the file local; it is not com
 
 The desktop uses `BRIDGE_ALLOWED_DIRS=/home/julien`, allowing sessions in the home directory and all its descendants, including `~/workspace`. This scope also includes hidden configuration and credential directories; access requires the bridge pairing key.
 
-Start the service and display the pairing QR:
+After turning NordVPN off, finish the move from a separate WSL terminal:
 
 ```bash
-systemctl --user enable --now ccpocket-bridge.service
+agent-wg-transition activate
 ccpocket-pair
 ```
 
+The script tests WireGuard egress and the Caddy-to-Bridge route before restarting `desktop-home-codex` last. If the cutover fails, it attempts to restore host mode. Run `agent-wg-transition recover` from a separate WSL terminal for manual recovery.
+
 For internet access, the global Caddy instance serves the wiki at `https://julienlavergne.asuscomm.com` and CC Pocket at `wss://julienlavergne.asuscomm.com:8765`. It uses the certificate exported from the ASUS router; the certificate and key stay under `~/.config/caddy/certs/` and outside Git. The router forwards public TCP 80 to desktop port 18080, public TCP 443 to desktop port 18443, and public TCP 8765 to desktop port 18765. These high local ports keep local ports 80 and 443 unused, while CC Pocket retains its dedicated public port. Keep `BRIDGE_API_KEY` configured.
 
-Run `reverse-proxy/configure-firewall.ps1` from an Administrator PowerShell window. It allows Caddy's high local ports 18080, 18443 and 18765, plus direct Bridge access on TCP 8765 only from Meshnet addresses in `100.64.0.0/10`; local ports 80 and 443 remain unused. The router forwards public TCP 80 to 18080, public TCP 443 to 18443, and public TCP 8765 to 18765. Caddy proxies the public WSS endpoint to the Bridge on local port 8765. For direct Meshnet access, use `ws://julien-desktop-meshnet:8765`; that connection bypasses Caddy, while Meshnet provides the private transport. WSL mirrored networking exposes these ports directly, so no Windows portproxy rule is required. To expose another web service, add a route snippet under `reverse-proxy/routes/web/`; the root domain block imports those snippets, and unmatched paths continue to the wiki. After renewing the router certificate, replace `cert.pem` and `key.pem` under `~/.config/caddy/certs/` and restart Caddy.
+Run `reverse-proxy/configure-firewall.ps1` from an Administrator PowerShell window. It allows Caddy's high local ports 18080, 18443 and 18765, plus local TCP 8765 only from Meshnet addresses in `100.64.0.0/10`; local ports 80 and 443 remain unused. The router forwards public TCP 80 to 18080, public TCP 443 to 18443, and public TCP 8765 to 18765. Caddy terminates TLS for the public WSS endpoint and forwards to the CCPocket Bridge inside `agent-wg`. For Meshnet access, use `ws://julien-desktop-meshnet:8765`; Caddy restricts that listener to Meshnet sources. The wiki is available over Meshnet at `http://julien-desktop-meshnet:18080`; Caddy restricts that host to Meshnet sources as well. WSL mirrored networking exposes these ports directly, so no Windows portproxy rule is required. To expose another web service, add a route snippet under `reverse-proxy/routes/web/`; the root domain block imports those snippets, and unmatched paths continue to the wiki. After renewing the router certificate, replace `cert.pem` and `key.pem` under `~/.config/caddy/certs/` and restart Caddy.
 
-At home, use mDNS or `ws://192.168.77.2:8765` for a direct LAN connection. That local URL is unencrypted; use it only on a trusted network. The QR uses `BRIDGE_PUBLIC_WS_URL` from the private configuration. Regenerate it with `ccpocket-pair` after changing the key or public address.
+At home or away, use `wss://julienlavergne.asuscomm.com:8765`. On Meshnet, `ws://julien-desktop-meshnet:8765` is also available through Caddy and restricted to Meshnet source addresses. The QR uses `BRIDGE_PUBLIC_WS_URL` from the private configuration. Regenerate it with `ccpocket-pair` after changing the key or public address.
 
 Use `systemctl --user restart ccpocket-bridge` after configuration or package updates, and `systemctl --user status ccpocket-bridge` or `journalctl --user -u ccpocket-bridge` to inspect it. `update-ai-clis` updates the installed Bridge package without restarting active sessions.
 
-On this desktop, CC Pocket connects to the existing Codex app/IDE daemon using `BRIDGE_CODEX_APP_SERVER_MODE=external` and a `ws+unix://<socket-path>:/` URL in the private local environment file. Codex's Unix endpoint accepts WebSocket connections; CC Pocket's WebSocket client supports this local transport. Sharing the same daemon lets CC Pocket resume threads owned by that daemon without creating a competing writer. The launcher ensures the daemon is running before starting the Bridge. Locate the active control socket with `ss -lxnp`; it is under `/tmp/codex-daemon-<uid>/`. This connection remains local; the phone uses the authenticated WSS endpoint through Caddy.
+On this desktop, CC Pocket connects to the Codex app-server using `BRIDGE_CODEX_APP_SERVER_MODE=external` and a `ws+unix://<socket-path>:/` URL in the private local environment file. The Codex daemon and Bridge run in `agent-wg`; a separate systemd user service manages the daemon. Locate its control socket with `ss -lxnp`; it is under `/tmp/codex-daemon-<uid>/`. The phone connects to the Bridge through Caddy's authenticated WSS endpoint, while Meshnet clients can use the restricted `ws://julien-desktop-meshnet:8765` listener.
 
 This integration has been verified with Codex 0.160.0 and Bridge 1.88.0. Threads owned by an independent Codex process still require a handoff. For a terminal client joining the desktop daemon, use `codex resume <thread-id> --remote unix://`.
 

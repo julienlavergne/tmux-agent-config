@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly expected_user='julien'
+readonly namespace='agent-wg'
+env_file=''
+
+[[ ${EUID} -eq 0 ]] || { printf '%s\n' 'This helper must be run through its sudo rule.' >&2; exit 1; }
+[[ ${SUDO_UID:-} == '1000' ]] || { printf '%s\n' 'This helper is restricted to Julien’s account.' >&2; exit 1; }
+[[ "$(getent passwd "$SUDO_UID" | cut -d: -f1)" == "$expected_user" ]] || {
+    printf '%s\n' 'The invoking account does not match the configured agent user.' >&2
+    exit 1
+}
+if [[ "${1:-}" == '--env-file' ]]; then
+    [[ $# -ge 2 ]] || { printf '%s\n' 'Missing environment file path.' >&2; exit 2; }
+    env_file="$2"
+    shift 2
+fi
+[[ $# -gt 0 ]] || { printf '%s\n' 'Usage: agent-wg-run [--env-file path] -- command [args...]' >&2; exit 2; }
+
+if [[ "${1:-}" == '--' ]]; then
+    shift
+fi
+[[ $# -gt 0 ]] || { printf '%s\n' 'No command was provided.' >&2; exit 2; }
+if [[ -n "$env_file" ]]; then
+    [[ "$env_file" == "/run/user/${SUDO_UID}/agent-wg-env."* && -f "$env_file" && ! -L "$env_file" ]] || {
+        printf '%s\n' 'The inherited environment file is not in the private user runtime directory.' >&2
+        exit 1
+    }
+    [[ "$(stat -c '%u:%a' "$env_file")" == "${SUDO_UID}:600" ]] || {
+        printf '%s\n' 'The inherited environment file must be owned by Julien with mode 600.' >&2
+        exit 1
+    }
+fi
+ip netns list | awk '{print $1}' | grep -Fxq "$namespace" || {
+    printf '%s\n' 'The agent-wg namespace is not active; refusing to launch outside the tunnel.' >&2
+    exit 1
+}
+ip -n "$namespace" link show dev wg-agent 2>/dev/null | grep -q '<[^>]*UP' || {
+    printf '%s\n' 'The WireGuard interface is down; refusing to launch outside the tunnel.' >&2
+    exit 1
+}
+ip -n "$namespace" -4 route show default | grep -q 'dev wg-agent' || {
+    printf '%s\n' 'The sandbox has no WireGuard default route; refusing to launch.' >&2
+    exit 1
+}
+
+readonly user_home="$(getent passwd "$SUDO_UID" | cut -d: -f6)"
+readonly user_shell="$(getent passwd "$SUDO_UID" | cut -d: -f7)"
+readonly node_bin="$(find "$user_home/.nvm/versions/node" -mindepth 2 -maxdepth 2 -type d -name bin -print 2>/dev/null | sort -V | tail -n 1)"
+readonly user_path="${user_home}/.local/bin${node_bin:+:${node_bin}}:/usr/local/bin:/usr/bin:/bin"
+readonly user_uid="$SUDO_UID"
+readonly user_gid="$(id -g "$expected_user")"
+
+if [[ -n "$env_file" ]]; then
+    readonly env_exec='import os,sys
+path=sys.argv[1]
+with open(path,"rb") as f: data=f.read()
+os.unlink(path)
+allowed=("BRIDGE_","ANTHROPIC_","CLAUDE_","AWS_","CODEX_")
+exact={"OPENAI_API_KEY","HTTP_PROXY","HTTPS_PROXY","ALL_PROXY","NO_PROXY","http_proxy","https_proxy","all_proxy","no_proxy"}
+env=os.environ.copy()
+for item in data.split(b"\0"):
+    if not item: continue
+    key,sep,value=item.partition(b"=")
+    if not sep: continue
+    name=os.fsdecode(key)
+    if name.startswith(allowed) or name in exact: env[name]=os.fsdecode(value)
+argv=sys.argv[2:]
+os.execvpe(argv[0],argv,env)'
+    exec /usr/sbin/ip netns exec "$namespace" \
+        /usr/bin/setpriv \
+            --reuid="$user_uid" \
+            --regid="$user_gid" \
+            --init-groups \
+            --no-new-privs \
+            /usr/bin/env -i \
+            "HOME=$user_home" \
+            "USER=$expected_user" \
+            "LOGNAME=$expected_user" \
+            "SHELL=$user_shell" \
+            "PATH=$user_path" \
+            "TERM=${TERM:-xterm-256color}" \
+            "LANG=${LANG:-C.UTF-8}" \
+            "XDG_RUNTIME_DIR=/run/user/$user_uid" \
+            "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$user_uid/bus" \
+            /usr/bin/python3 -c "$env_exec" "$env_file" "$@"
+fi
+
+exec /usr/sbin/ip netns exec "$namespace" \
+    /usr/bin/setpriv \
+        --reuid="$user_uid" \
+        --regid="$user_gid" \
+        --init-groups \
+        --no-new-privs \
+        /usr/bin/env -i \
+        "HOME=$user_home" \
+        "USER=$expected_user" \
+        "LOGNAME=$expected_user" \
+        "SHELL=$user_shell" \
+        "PATH=$user_path" \
+        "TERM=${TERM:-xterm-256color}" \
+        "LANG=${LANG:-C.UTF-8}" \
+        "XDG_RUNTIME_DIR=/run/user/$user_uid" \
+        "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$user_uid/bus" \
+        "$@"

@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+inherit_env=0
+if [[ "${1:-}" == '--inherit-env' ]]; then
+    inherit_env=1
+    shift
+fi
+if [[ "${1:-}" == '--' ]]; then
+    shift
+fi
+[[ $# -gt 0 ]] || { printf '%s\n' 'Usage: agent-wg-run [--inherit-env] -- command [args...]' >&2; exit 2; }
+
+if [[ "$inherit_env" == 0 ]]; then
+    exec /usr/bin/sudo -n /usr/local/libexec/agent-wg-enter -- "$@"
+fi
+
+readonly runtime_dir="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+[[ -d "$runtime_dir" && -O "$runtime_dir" ]] || {
+    printf '%s\n' 'A private user runtime directory is required to pass the service environment.' >&2
+    exit 1
+}
+env_file="$(mktemp "${runtime_dir}/agent-wg-env.XXXXXX")"
+chmod 0600 "$env_file"
+trap 'rm -f "$env_file"' EXIT
+/usr/bin/env -0 >"$env_file"
+
+set +e
+/usr/bin/sudo -n /usr/local/libexec/agent-wg-enter --env-file "$env_file" -- "$@"
+status=$?
+set -e
+exit "$status"

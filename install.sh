@@ -41,6 +41,7 @@ LINKS=(
     "ccpocket/start-bridge|${HOME}/.local/bin/start-ccpocket-bridge"
     "ccpocket/pair|${HOME}/.local/bin/ccpocket-pair"
     "ccpocket/ccpocket-bridge.service|${HOME}/.config/systemd/user/ccpocket-bridge.service"
+    "ccpocket/ccpocket-bridge-host.service|${HOME}/.config/systemd/user/ccpocket-bridge-host.service"
     "shared/AGENTS.md|${HOME}/.codex/AGENTS.md"
     "shared/AGENTS.md|${HOME}/.claude/rules/preferences.md"
     "claude/rules/common.md|${HOME}/.claude/rules/common.md"
@@ -52,8 +53,9 @@ LINKS=(
     "ai-sessions/ai-session@.service|${HOME}/.config/systemd/user/ai-session@.service"
     "ai-sessions/codex-remote-control.service|${HOME}/.config/systemd/user/codex-remote-control.service"
     "ai-sessions/ai-session-watch|${HOME}/.local/bin/ai-session-watch"
-    "wireguard-agent/agent-vpn-run|${HOME}/.local/bin/agent-vpn-run"
-    "wireguard-agent/codex-remote-control-agent-vpn.service|${HOME}/.config/systemd/user/codex-remote-control-agent-vpn.service"
+    "wireguard-agent/agent-wg-run|${HOME}/.local/bin/agent-wg-run"
+    "wireguard-agent/agent-wg-transition.sh|${HOME}/.local/bin/agent-wg-transition"
+    "wireguard-agent/codex-remote-control-agent-wg.service|${HOME}/.config/systemd/user/codex-remote-control-agent-wg.service"
     "ai-sessions/restart-ai-sessions|${HOME}/.local/bin/restart-ai-sessions"
     "ai-sessions/update-ai-clis.sh|${HOME}/.local/bin/update-ai-clis"
     "ai-sessions/update-ai-clis.sh|${HOME}/update-ai-clis.sh"
@@ -120,7 +122,7 @@ do_install() {
     done
     seed_codex_config
 
-    chmod +x "${REPO_DIR}/tmux/tmux-picker" "${REPO_DIR}/claude/statusline/statusline.sh" "${REPO_DIR}/codex/launcher" "${REPO_DIR}/ccpocket/start-bridge" "${REPO_DIR}/ccpocket/pair" "${REPO_DIR}/ai-sessions/ai-session-watch" "${REPO_DIR}/ai-sessions/ai-session-codex" "${REPO_DIR}/ai-sessions/ai-session-copilot" "${REPO_DIR}/ai-sessions/restart-ai-sessions" "${REPO_DIR}/ai-sessions/update-ai-clis.sh" "${REPO_DIR}/wireguard-agent/agent-vpn-netns.sh" "${REPO_DIR}/wireguard-agent/agent-vpn-enter" "${REPO_DIR}/wireguard-agent/agent-vpn-run" "${REPO_DIR}/wireguard-agent/install-agent-vpn.sh"
+    chmod +x "${REPO_DIR}/tmux/tmux-picker" "${REPO_DIR}/claude/statusline/statusline.sh" "${REPO_DIR}/codex/launcher" "${REPO_DIR}/ccpocket/start-bridge" "${REPO_DIR}/ccpocket/pair" "${REPO_DIR}/ai-sessions/ai-session-watch" "${REPO_DIR}/ai-sessions/ai-session-codex" "${REPO_DIR}/ai-sessions/ai-session-copilot" "${REPO_DIR}/ai-sessions/restart-ai-sessions" "${REPO_DIR}/ai-sessions/update-ai-clis.sh" "${REPO_DIR}/wireguard-agent/agent-wg-netns.sh" "${REPO_DIR}/wireguard-agent/agent-wg-enter" "${REPO_DIR}/wireguard-agent/agent-wg-run" "${REPO_DIR}/wireguard-agent/agent-wg-transition.sh" "${REPO_DIR}/wireguard-agent/install-agent-wg.sh"
 
     if command -v systemctl >/dev/null 2>&1; then
         systemctl --user daemon-reload

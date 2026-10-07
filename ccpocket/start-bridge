@@ -7,6 +7,46 @@ if [[ -s "${NVM_DIR}/nvm.sh" ]]; then
 fi
 export PATH="${HOME}/.local/bin:${PATH}"
 
+configured_bridge_host="${BRIDGE_HOST:-$(sed -n 's/^BRIDGE_HOST=//p' "${HOME}/.config/ccpocket/bridge.env" 2>/dev/null | head -n 1)}"
+agent_wg_bridge_host="$(sed -n 's/^BRIDGE_HOST=//p' /etc/agent-wg/network.env 2>/dev/null | head -n 1)"
+if [[ -z "$configured_bridge_host" ]]; then
+    configured_bridge_host="$agent_wg_bridge_host"
+fi
+if [[ -n "$agent_wg_bridge_host" && "$configured_bridge_host" == "$agent_wg_bridge_host" \
+    && "${BRIDGE_LAUNCH_SOURCE:-}" != 'agent-wg-service' ]]; then
+    export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+    export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUNTIME_DIR}/bus}"
+    systemctl --user start ccpocket-bridge.service
+    systemctl --user is-active --quiet ccpocket-bridge.service || {
+        echo 'CCPocket Bridge could not start inside agent-wg; the namespace may be down.' >&2
+        exit 1
+    }
+    exit 0
+fi
+if [[ "$configured_bridge_host" == '0.0.0.0' && "${BRIDGE_LAUNCH_SOURCE:-}" != 'host-service' ]]; then
+    export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+    export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUNTIME_DIR}/bus}"
+    systemctl --user start ccpocket-bridge-host.service
+    systemctl --user is-active --quiet ccpocket-bridge-host.service || {
+        echo 'The host-network CCPocket Bridge could not be started.' >&2
+        exit 1
+    }
+    exit 0
+fi
+if [[ -n "$agent_wg_bridge_host" && "$configured_bridge_host" == "$agent_wg_bridge_host" ]]; then
+    namespace_ref="$(readlink /run/netns/agent-wg 2>/dev/null || true)"
+    if [[ -z "$namespace_ref" || "$(readlink /proc/self/ns/net)" != "$namespace_ref" ]]; then
+        export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+        export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUNTIME_DIR}/bus}"
+        systemctl --user start ccpocket-bridge.service
+        systemctl --user is-active --quiet ccpocket-bridge.service || {
+            echo 'CCPocket Bridge could not start inside agent-wg; the namespace may be down.' >&2
+            exit 1
+        }
+        exit 0
+    fi
+fi
+
 bridge_package="$(npm root -g)/@ccpocket/bridge/dist/cli.js"
 if [[ ! -f "$bridge_package" ]]; then
     echo "CC Pocket Bridge is missing; install @ccpocket/bridge in the active Node environment." >&2
@@ -17,8 +57,10 @@ if [[ -z "${BRIDGE_API_KEY:-}" ]]; then
     exit 1
 fi
 
-if [[ "${BRIDGE_CODEX_APP_SERVER_MODE:-}" == external && "${BRIDGE_CODEX_SHARED_APP_SERVER_URL:-}" == ws+unix://* ]]; then
-    "${HOME}/.local/bin/codex" app-server daemon start >/dev/null
+if [[ "${BRIDGE_CODEX_APP_SERVER_MODE:-}" == external && "${BRIDGE_CODEX_SHARED_APP_SERVER_URL:-}" == ws+unix://* ]] \
+    && ! systemctl --user is-active --quiet codex-remote-control-agent-wg.service \
+    && ! systemctl --user is-active --quiet codex-remote-control.service; then
+    echo "The shared Codex app-server service is not active." >&2
 fi
 
 # Pairing credentials are displayed only by the local pairing command.

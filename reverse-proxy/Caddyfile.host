@@ -10,14 +10,6 @@ http://julien-desktop-meshnet {
 	respond "Meshnet access only" 403
 }
 
-http://julien-desktop-meshnet:8081 {
-	@meshnet remote_ip 100.64.0.0/10
-	handle @meshnet {
-		reverse_proxy {$BRIDGE_HOST}:{$BRIDGE_PORT}
-	}
-	respond "Meshnet access only" 403
-}
-
 julienlavergne.asuscomm.com {
 	tls /etc/caddy/certs/cert.pem /etc/caddy/certs/key.pem
 	import /etc/caddy/routes/web/*.caddy
@@ -28,5 +20,5 @@ julienlavergne.asuscomm.com {
 
 https://julienlavergne.asuscomm.com:8765 {
 	tls /etc/caddy/certs/cert.pem /etc/caddy/certs/key.pem
-	reverse_proxy {$BRIDGE_HOST}:{$BRIDGE_PORT}
+	reverse_proxy host.docker.internal:8765
 }

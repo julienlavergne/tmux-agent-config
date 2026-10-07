@@ -1,5 +1,6 @@
 [Unit]
 Description=Codex Remote Control Daemon inside the Freebox WireGuard namespace
+ConditionPathExists=/run/netns/agent-wg
 After=default.target
 Conflicts=codex-remote-control.service
 
@@ -7,7 +8,7 @@ Conflicts=codex-remote-control.service
 Type=oneshot
 RemainAfterExit=yes
 ExecStartPre=-%h/.local/bin/codex remote-control stop
-ExecStart=%h/.local/bin/agent-vpn-run -- %h/.local/bin/codex remote-control start
+ExecStart=%h/.local/bin/agent-wg-run -- %h/.local/bin/codex remote-control start
 ExecStop=%h/.local/bin/codex remote-control stop
 
 [Install]
